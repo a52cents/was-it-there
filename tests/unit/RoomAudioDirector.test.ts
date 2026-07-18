@@ -1,0 +1,84 @@
+import { describe, expect, it, vi } from 'vitest';
+import { RoomAudioDirector } from '../../src/audio/RoomAudioDirector';
+import type { BlackoutSnapshot } from '../../src/gameplay/anomalies/BlackoutTimeline';
+
+function createHarness() {
+  const audio = {
+    play: vi.fn(),
+    stop: vi.fn(),
+  };
+  return {
+    audio,
+    director: new RoomAudioDirector(audio),
+  };
+}
+
+describe('RoomAudioDirector', () => {
+  it('starts and stops the continuous bedroom ambience', () => {
+    const { audio, director } = createHarness();
+
+    director.startRoom();
+    director.finishRoom();
+
+    expect(audio.play).toHaveBeenCalledWith('room-ambience');
+    expect(audio.stop).toHaveBeenCalledWith('room-ambience');
+  });
+
+  it('plays one light-return cue per blackout', () => {
+    const { audio, director } = createHarness();
+
+    director.beginBlackout();
+    director.updateBlackout(createBlackoutSnapshot('full-black'));
+    director.updateBlackout(createBlackoutSnapshot('reveal'));
+    director.updateBlackout(createBlackoutSnapshot('reveal'));
+    director.updateBlackout(createBlackoutSnapshot('complete'));
+
+    expect(audio.play).toHaveBeenCalledWith('blackout-cue');
+    expect(audio.play.mock.calls.filter(([id]) => id === 'lights-return')).toHaveLength(1);
+
+    director.beginBlackout();
+    director.updateBlackout(createBlackoutSnapshot('reveal'));
+    expect(audio.play.mock.calls.filter(([id]) => id === 'lights-return')).toHaveLength(2);
+  });
+
+  it('separates the door unlock and opening effects', () => {
+    const { audio, director } = createHarness();
+
+    director.openExitDoor();
+
+    expect(audio.play.mock.calls).toEqual([
+      ['door-unlock'],
+      ['door-open'],
+    ]);
+  });
+
+  it('stops every persistent or delayed room cue when reset', () => {
+    const { audio, director } = createHarness();
+
+    director.startRoom();
+    director.beginBlackout();
+    director.openExitDoor();
+    director.reset();
+
+    expect(audio.stop.mock.calls).toEqual([
+      ['room-ambience'],
+      ['blackout-cue'],
+      ['lights-return'],
+      ['door-unlock'],
+      ['door-open'],
+    ]);
+  });
+});
+
+function createBlackoutSnapshot(
+  stage: BlackoutSnapshot['stage'],
+): BlackoutSnapshot {
+  return {
+    stage,
+    elapsedMs: 0,
+    overlayOpacity: 0,
+    lightMultiplier: 1,
+    anomalyApplicationDue: false,
+    complete: stage === 'complete',
+  };
+}

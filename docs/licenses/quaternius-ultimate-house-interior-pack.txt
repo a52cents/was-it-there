@@ -1,0 +1,9 @@
+Ultimate House Interior Pack
+
+Creator: Quaternius
+License: Creative Commons Zero 1.0 Universal (CC0)
+Source and license record:
+https://poly.pizza/bundle/Ultimate-House-Interior-Pack-2SXnFbwFzm
+
+The FBX source pack is retained under pre-assets/2nd pack for possible future
+rooms. No model from this pack is currently referenced by the production build.

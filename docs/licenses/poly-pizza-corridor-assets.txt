@@ -1,0 +1,24 @@
+POLY PIZZA — FIRST CORRIDOR ASSET ATTRIBUTIONS
+Retrieved: 18 July 2026
+
+Office Phone
+Creator: dook
+Source: https://poly.pizza/m/YxfMuchpUF
+License displayed by source: Creative Commons Attribution
+Local file: src/assets/models/corridor/prop-office-phone.glb
+
+Analog clock
+Creator: Poly by Google
+Source: https://poly.pizza/m/5gAoMR2YHs3
+License displayed by source: Creative Commons Attribution
+Local file: src/assets/models/corridor/prop-wall-clock.glb
+
+Boots
+Creator: Isa Lousberg
+Source: https://poly.pizza/m/7XCvej7wZU
+License displayed by source: Public Domain (CC0)
+Local file: src/assets/models/corridor/prop-boots.glb
+
+The two Creative Commons Attribution credits above must remain in the shipped
+game credits and accompanying distribution documentation. Poly Pizza does not
+display a license version number on these model pages as of the retrieval date.

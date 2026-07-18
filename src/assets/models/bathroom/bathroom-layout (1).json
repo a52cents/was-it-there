@@ -1,0 +1,364 @@
+{
+  "formatVersion": 1,
+  "documentType": "room-layout",
+  "roomId": "bathroom",
+  "objects": [
+    {
+      "targetId": "bath-mat",
+      "nodeName": "ANOM_Bath_Mat",
+      "position": [
+        -0.56,
+        0.012,
+        0.48
+      ],
+      "quaternion": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "targetId": "bathtub",
+      "nodeName": "ANOM_Bath_Bathtub",
+      "position": [
+        -2.05,
+        0,
+        -0.72
+      ],
+      "quaternion": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "targetId": "bin",
+      "nodeName": "ANOM_Bath_Bin",
+      "position": [
+        1.52,
+        0,
+        -2.4
+      ],
+      "quaternion": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "targetId": "candle",
+      "nodeName": "ANOM_Bath_Candle",
+      "position": [
+        -2.6500000000000004,
+        1.54,
+        1.04
+      ],
+      "quaternion": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "targetId": "mirror",
+      "nodeName": "ANOM_Bath_Mirror",
+      "position": [
+        0.45,
+        1.8,
+        -2.98
+      ],
+      "quaternion": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "targetId": "plant",
+      "nodeName": "ANOM_Bath_Plant",
+      "position": [
+        -0.1,
+        0.5,
+        -2.4000000000000004
+      ],
+      "quaternion": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "targetId": "rubber-duck",
+      "nodeName": "ANOM_Bath_RubberDuck",
+      "position": [
+        -2.05,
+        0.5,
+        -0.72
+      ],
+      "quaternion": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "targetId": "slippers",
+      "nodeName": "ANOM_Bath_Slippers",
+      "position": [
+        0.55,
+        0.01,
+        0.75
+      ],
+      "quaternion": [
+        0,
+        0.9990482215818578,
+        0,
+        0.04361938736533601
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "targetId": "soap-dish",
+      "nodeName": "ANOM_Bath_SoapDish",
+      "position": [
+        1,
+        0.915,
+        -2.95
+      ],
+      "quaternion": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "targetId": "toilet",
+      "nodeName": "ANOM_Bath_Toilet",
+      "position": [
+        2.25,
+        0,
+        -0.72
+      ],
+      "quaternion": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "targetId": "toilet-roll-holder",
+      "nodeName": "ANOM_Bath_ToiletRollHolder",
+      "position": [
+        2.77,
+        0.84,
+        -0.02
+      ],
+      "quaternion": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "targetId": "toilet-rolls",
+      "nodeName": "ANOM_Bath_ToiletRolls",
+      "position": [
+        2.23,
+        0,
+        0.18
+      ],
+      "quaternion": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "targetId": "toothbrush-cup",
+      "nodeName": "ANOM_Bath_ToothbrushCup",
+      "position": [
+        0.9500000000000001,
+        0.5,
+        -2.3000000000000003
+      ],
+      "quaternion": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "targetId": "towel",
+      "nodeName": "ANOM_Bath_Towel",
+      "position": [
+        2.76,
+        1.35,
+        0.38
+      ],
+      "quaternion": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "targetId": "towels-stacked",
+      "nodeName": "ANOM_Bath_TowelsStacked",
+      "position": [
+        -2.6500000000000004,
+        1.54,
+        1.7000000000000002
+      ],
+      "quaternion": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "targetId": "vanity",
+      "nodeName": "ANOM_Bath_Vanity",
+      "position": [
+        0.45,
+        0,
+        -2.7
+      ],
+      "quaternion": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    },
+    {
+      "targetId": "wall-shelf",
+      "nodeName": "ANOM_Bath_WallShelf",
+      "position": [
+        -2.66,
+        1.36,
+        1.32
+      ],
+      "quaternion": [
+        0,
+        0,
+        0,
+        1
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ],
+      "visible": true
+    }
+  ]
+}

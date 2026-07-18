@@ -1,0 +1,13 @@
+KayKit - Furniture Bits
+Version: 1.0 Free
+Created by Kay Lousberg / KayKit
+Official source: https://www.kaylousberg.com/game-assets/furniture-bits
+
+License: Creative Commons Zero 1.0 Universal (CC0)
+https://creativecommons.org/publicdomain/zero/1.0/
+
+The creator’s official page states that the pack is free for personal and
+commercial use and that attribution is not required.
+
+This provenance notice was archived for the Was It There? project on
+18 July 2026 when the project owner supplied the glTF edition of the pack.

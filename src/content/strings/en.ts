@@ -1,0 +1,18 @@
+export const ENGLISH_COPY = {
+  changesLeft: 'CHANGES LEFT',
+  errors: 'ERRORS',
+  reportCorrect: 'CHANGE FOUND',
+  reportIncorrect: 'NOT A CHANGE',
+  searchTimeout: "TIME'S UP",
+  gameOver: 'GAME OVER',
+  missedAnomaly: 'MISSED ANOMALY',
+  anomalyRevealHint: 'OUTLINED IN RED IN THE ROOM',
+  roomReached: 'ROOM REACHED',
+  finalTime: 'FINAL TIME',
+  tryAgain: 'TRY AGAIN',
+  victory: 'YOU GOT OUT',
+  activeTime: 'ACTIVE TIME',
+  penalties: 'PENALTIES',
+  perfectRun: 'PERFECT RUN',
+  playAgain: 'PLAY AGAIN',
+} as const;
