@@ -1,18 +1,18 @@
-import type { GameMode } from '../gameplay/run/GameMode';
+import type { GameMode } from "../gameplay/run/GameMode";
 
 const START_SCREEN_COPY = {
-  title: 'WAS IT THERE?',
-  loading: 'PREPARING THE ROOM',
+  title: "WAS IT THERE?",
+  loading: "LOADING",
   modes: {
     story: {
-      play: 'BEGIN THE STORY',
+      play: "ENTER THE HOUSE",
     },
     escape: {
-      play: 'START ESCAPE',
+      play: "START ESCAPE",
     },
   },
-  escapeLocked: 'Complete Story to unlock Escape.',
-  escapeUnlocked: 'Find the changes. Race to the exit.',
+  escapeLocked: "Complete Story to unlock Escape.",
+  escapeUnlocked: "Find the changes. Race to the exit.",
 } as const;
 
 type StartHandler = (mode: GameMode) => Promise<void> | void;
@@ -22,7 +22,7 @@ export class StartScreen {
   private startHandler: StartHandler | null = null;
   private notebookHandler: NotebookHandler | null = null;
   private busy = true;
-  private selectedMode: GameMode = 'story';
+  private selectedMode: GameMode = "story";
   private escapeUnlocked = false;
 
   public constructor(
@@ -34,26 +34,16 @@ export class StartScreen {
     private readonly escapeModeDescription: HTMLElement,
     private readonly notebookButton: HTMLButtonElement,
   ) {
-    title.textContent = START_SCREEN_COPY.title;
-    title.dataset.text = START_SCREEN_COPY.title;
+    title.setAttribute("aria-label", START_SCREEN_COPY.title);
     this.playButton.textContent = START_SCREEN_COPY.loading;
     this.playButton.disabled = true;
     this.storyModeButton.disabled = true;
     this.escapeModeButton.disabled = true;
     this.notebookButton.disabled = true;
-    this.playButton.addEventListener('click', this.handlePlayClick);
-    this.storyModeButton.addEventListener(
-      'click',
-      this.handleStoryModeClick,
-    );
-    this.escapeModeButton.addEventListener(
-      'click',
-      this.handleEscapeModeClick,
-    );
-    this.notebookButton.addEventListener(
-      'click',
-      this.handleNotebookClick,
-    );
+    this.playButton.addEventListener("click", this.handlePlayClick);
+    this.storyModeButton.addEventListener("click", this.handleStoryModeClick);
+    this.escapeModeButton.addEventListener("click", this.handleEscapeModeClick);
+    this.notebookButton.addEventListener("click", this.handleNotebookClick);
     this.setEscapeUnlocked(false);
   }
 
@@ -74,20 +64,20 @@ export class StartScreen {
     this.playButton.textContent = busy
       ? START_SCREEN_COPY.loading
       : START_SCREEN_COPY.modes[this.selectedMode].play;
-    this.playButton.setAttribute('aria-busy', String(busy));
-    this.root.classList.toggle('is-loading', busy);
+    this.playButton.setAttribute("aria-busy", String(busy));
+    this.root.classList.toggle("is-loading", busy);
   }
 
   public setEscapeUnlocked(unlocked: boolean): void {
     this.escapeUnlocked = unlocked;
 
-    if (!unlocked && this.selectedMode === 'escape') {
-      this.selectedMode = 'story';
+    if (!unlocked && this.selectedMode === "escape") {
+      this.selectedMode = "story";
       this.playButton.textContent = START_SCREEN_COPY.modes.story.play;
     }
 
     this.escapeModeButton.disabled = this.busy || !unlocked;
-    this.escapeModeButton.setAttribute('aria-disabled', String(!unlocked));
+    this.escapeModeButton.setAttribute("aria-disabled", String(!unlocked));
     this.escapeModeButton.dataset.locked = String(!unlocked);
     this.escapeModeDescription.textContent = unlocked
       ? START_SCREEN_COPY.escapeUnlocked
@@ -97,28 +87,25 @@ export class StartScreen {
 
   public show(): void {
     this.root.hidden = false;
-    this.root.setAttribute('aria-hidden', 'false');
+    this.root.setAttribute("aria-hidden", "false");
   }
 
   public hide(): void {
     this.root.hidden = true;
-    this.root.setAttribute('aria-hidden', 'true');
+    this.root.setAttribute("aria-hidden", "true");
   }
 
   public dispose(): void {
-    this.playButton.removeEventListener('click', this.handlePlayClick);
+    this.playButton.removeEventListener("click", this.handlePlayClick);
     this.storyModeButton.removeEventListener(
-      'click',
+      "click",
       this.handleStoryModeClick,
     );
     this.escapeModeButton.removeEventListener(
-      'click',
+      "click",
       this.handleEscapeModeClick,
     );
-    this.notebookButton.removeEventListener(
-      'click',
-      this.handleNotebookClick,
-    );
+    this.notebookButton.removeEventListener("click", this.handleNotebookClick);
     this.startHandler = null;
     this.notebookHandler = null;
   }
@@ -127,7 +114,7 @@ export class StartScreen {
     if (
       this.busy ||
       this.selectedMode === mode ||
-      (mode === 'escape' && !this.escapeUnlocked)
+      (mode === "escape" && !this.escapeUnlocked)
     ) {
       return;
     }
@@ -138,25 +125,19 @@ export class StartScreen {
   }
 
   private renderModeSelection(): void {
-    const storySelected = this.selectedMode === 'story';
-    this.storyModeButton.classList.toggle('is-selected', storySelected);
-    this.storyModeButton.setAttribute(
-      'aria-pressed',
-      String(storySelected),
-    );
-    this.escapeModeButton.classList.toggle('is-selected', !storySelected);
-    this.escapeModeButton.setAttribute(
-      'aria-pressed',
-      String(!storySelected),
-    );
+    const storySelected = this.selectedMode === "story";
+    this.storyModeButton.classList.toggle("is-selected", storySelected);
+    this.storyModeButton.setAttribute("aria-pressed", String(storySelected));
+    this.escapeModeButton.classList.toggle("is-selected", !storySelected);
+    this.escapeModeButton.setAttribute("aria-pressed", String(!storySelected));
   }
 
   private readonly handleStoryModeClick = (): void => {
-    this.selectMode('story');
+    this.selectMode("story");
   };
 
   private readonly handleEscapeModeClick = (): void => {
-    this.selectMode('escape');
+    this.selectMode("escape");
   };
 
   private readonly handleNotebookClick = (): void => {
@@ -181,7 +162,7 @@ export class StartScreen {
       await this.startHandler?.(mode);
     } catch (error: unknown) {
       this.show();
-      console.error('Unable to start the game experience.', error);
+      console.error("Unable to start the game experience.", error);
     } finally {
       this.setBusy(false);
     }
