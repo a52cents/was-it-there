@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import { StartScreen } from '../../src/ui/StartScreen';
+import { describe, expect, it, vi } from "vitest";
+import { StartScreen } from "../../src/ui/StartScreen";
 
 class FakeClassList {
   private readonly values = new Set<string>();
@@ -56,13 +56,14 @@ class FakeButton extends FakeElement {
       return;
     }
 
-    this.listeners.get('click')?.({} as Event);
+    this.listeners.get("click")?.({} as Event);
   }
 }
 
 function createStartScreen(): {
   readonly screen: StartScreen;
   readonly root: FakeElement;
+  readonly title: FakeElement;
   readonly play: FakeButton;
   readonly story: FakeButton;
   readonly escape: FakeButton;
@@ -89,6 +90,7 @@ function createStartScreen(): {
   return {
     screen,
     root,
+    title,
     play,
     story,
     escape,
@@ -97,26 +99,33 @@ function createStartScreen(): {
   };
 }
 
-describe('StartScreen', () => {
-  it('defaults to Story and exposes the selected mode to the start handler', () => {
+describe("StartScreen", () => {
+  it("preserves the authored title markup and adds an accessible label", () => {
+    const { title } = createStartScreen();
+
+    expect(title.textContent).toBeNull();
+    expect(title.getAttribute("aria-label")).toBe("WAS IT THERE?");
+  });
+
+  it("defaults to Story and exposes the selected mode to the start handler", () => {
     const { screen, root, play, story, escape } = createStartScreen();
     const start = vi.fn();
     screen.onStart(start);
     screen.setBusy(false);
 
-    expect(story.getAttribute('aria-pressed')).toBe('true');
-    expect(story.classList.contains('is-selected')).toBe(true);
-    expect(escape.getAttribute('aria-pressed')).toBe('false');
-    expect(play.textContent).toBe('BEGIN THE STORY');
+    expect(story.getAttribute("aria-pressed")).toBe("true");
+    expect(story.classList.contains("is-selected")).toBe(true);
+    expect(escape.getAttribute("aria-pressed")).toBe("false");
+    expect(play.textContent).toBe("ENTER THE HOUSE");
 
     play.click();
 
-    expect(start).toHaveBeenCalledWith('story');
+    expect(start).toHaveBeenCalledWith("story");
     expect(root.hidden).toBe(true);
-    expect(root.getAttribute('aria-hidden')).toBe('true');
+    expect(root.getAttribute("aria-hidden")).toBe("true");
   });
 
-  it('lets the player select Escape before starting', () => {
+  it("lets the player select Escape before starting", () => {
     const { screen, play, story, escape } = createStartScreen();
     const start = vi.fn();
     screen.onStart(start);
@@ -125,36 +134,36 @@ describe('StartScreen', () => {
 
     escape.click();
 
-    expect(story.getAttribute('aria-pressed')).toBe('false');
-    expect(escape.getAttribute('aria-pressed')).toBe('true');
-    expect(escape.classList.contains('is-selected')).toBe(true);
-    expect(play.textContent).toBe('START ESCAPE');
+    expect(story.getAttribute("aria-pressed")).toBe("false");
+    expect(escape.getAttribute("aria-pressed")).toBe("true");
+    expect(escape.classList.contains("is-selected")).toBe(true);
+    expect(play.textContent).toBe("START ESCAPE");
 
     play.click();
 
-    expect(start).toHaveBeenCalledWith('escape');
+    expect(start).toHaveBeenCalledWith("escape");
   });
 
-  it('keeps Escape locked until Story completion is recorded', () => {
+  it("keeps Escape locked until Story completion is recorded", () => {
     const { screen, escape, escapeDescription } = createStartScreen();
     screen.setBusy(false);
 
     expect(escape.disabled).toBe(true);
-    expect(escape.getAttribute('aria-disabled')).toBe('true');
+    expect(escape.getAttribute("aria-disabled")).toBe("true");
     expect(escapeDescription.textContent).toBe(
-      'Complete Story to unlock Escape.',
+      "Complete Story to unlock Escape.",
     );
 
     screen.setEscapeUnlocked(true);
 
     expect(escape.disabled).toBe(false);
-    expect(escape.getAttribute('aria-disabled')).toBe('false');
+    expect(escape.getAttribute("aria-disabled")).toBe("false");
     expect(escapeDescription.textContent).toBe(
-      'Find the changes. Race to the exit.',
+      "Find the changes. Race to the exit.",
     );
   });
 
-  it('disables mode selection and starting while loading', () => {
+  it("disables mode selection and starting while loading", () => {
     const { screen, play, story, escape, notebook } = createStartScreen();
     const start = vi.fn();
     screen.onStart(start);
@@ -163,13 +172,13 @@ describe('StartScreen', () => {
     play.click();
 
     expect(start).not.toHaveBeenCalled();
-    expect(play.textContent).toBe('PREPARING THE ROOM');
+    expect(play.textContent).toBe("LOADING");
     expect(story.disabled).toBe(true);
     expect(escape.disabled).toBe(true);
     expect(notebook.disabled).toBe(true);
   });
 
-  it('opens the persistent Story notebook from the mode menu', () => {
+  it("opens the persistent Story notebook from the mode menu", () => {
     const { screen, notebook } = createStartScreen();
     const openNotebook = vi.fn();
     screen.onNotebook(openNotebook);
