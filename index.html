@@ -16,31 +16,19 @@
       ></canvas>
 
       <div id="menu-layer">
-        <div class="menu-atmosphere" aria-hidden="true">
-          <span class="menu-atmosphere__halo"></span>
-          <span class="menu-atmosphere__door"></span>
-          <span class="menu-atmosphere__sweep"></span>
-          <span class="menu-atmosphere__grain"></span>
-        </div>
-
-        <span class="menu-corner menu-corner--top-left" aria-hidden="true"></span>
-        <span class="menu-corner menu-corner--top-right" aria-hidden="true"></span>
-        <span class="menu-corner menu-corner--bottom-left" aria-hidden="true"></span>
-        <span class="menu-corner menu-corner--bottom-right" aria-hidden="true"></span>
+        <div class="menu-backdrop" aria-hidden="true"></div>
 
         <main class="start-screen" aria-labelledby="game-title">
-          <p class="start-screen__protocol">
-            <span aria-hidden="true"></span>
-            OBSERVATION PROTOCOL / 01
-          </p>
+          <p class="start-screen__time">03:17</p>
 
           <div class="start-screen__title-block">
-            <p class="start-screen__location">ROOM 01 — BEDROOM</p>
-            <h1 id="game-title" data-text="WAS IT THERE?">
-              WAS IT THERE?
+            <h1 id="game-title">
+              <span>WAS IT</span>
+              <span>THERE?</span>
             </h1>
             <p class="start-screen__premise">
-              Memorize what is real.<br />Report what is not.
+              Study the room.<br />
+              When the lights return, report what changed.
             </p>
           </div>
 
@@ -57,9 +45,13 @@
               aria-pressed="true"
               disabled
             >
-              <strong>STORY</strong>
-              <span>Break the loop. Remember who lived here.</span>
+              <span class="mode-option__number" aria-hidden="true">01</span>
+              <span class="mode-option__body">
+                <strong>STORY</strong>
+                <span>Break the loop. Remember who lived here.</span>
+              </span>
             </button>
+
             <button
               id="escape-mode-button"
               class="mode-option"
@@ -67,36 +59,35 @@
               aria-pressed="false"
               disabled
             >
-              <strong>ESCAPE</strong>
-              <span id="escape-mode-description">
-                Complete Story to unlock Escape.
+              <span class="mode-option__number" aria-hidden="true">02</span>
+              <span class="mode-option__body">
+                <strong>ESCAPE</strong>
+                <span id="escape-mode-description">
+                  Complete Story to unlock Escape.
+                </span>
               </span>
             </button>
           </div>
 
-          <button id="play-button" type="button" disabled>
-            PREPARING THE ROOM
-          </button>
+          <div class="start-screen__actions">
+            <button id="play-button" type="button" disabled>LOADING</button>
 
-          <button
-            id="story-notebook-button"
-            class="start-screen__secondary-action"
-            type="button"
-            disabled
-          >
-            OPEN NOTEBOOK
-          </button>
+            <button
+              id="story-notebook-button"
+              class="start-screen__secondary-action"
+              type="button"
+              disabled
+            >
+              OPEN NOTEBOOK
+            </button>
+          </div>
 
           <div class="start-screen__controls" aria-label="Game controls">
-            <span><kbd>WASD</kbd> MOVE</span>
-            <span><kbd>MOUSE</kbd> LOOK</span>
-            <span><kbd>CLICK</kbd> REPORT</span>
+            <span>WASD / MOVE</span>
+            <span>MOUSE / LOOK</span>
+            <span>CLICK / REPORT</span>
           </div>
         </main>
-
-        <p class="menu-build-mark" aria-hidden="true">
-          MEMORY IS AN UNRELIABLE WITNESS
-        </p>
       </div>
 
       <div id="hud-layer" aria-live="off"></div>
