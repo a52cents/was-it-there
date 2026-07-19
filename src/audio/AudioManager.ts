@@ -1,3 +1,7 @@
+import {
+  createProceduralHorrorScore,
+} from './ProceduralHorrorScore';
+
 export type AudioCategory =
   | 'master'
   | 'music'
@@ -5,12 +9,33 @@ export type AudioCategory =
   | 'effects'
   | 'interface';
 
+export const STORY_AUDIO_CUE_IDS = [
+  'story-radio-burst',
+  'story-photo-memory',
+  'story-radio-message',
+  'story-radio-search',
+  'story-bathroom-pipes',
+  'story-bathroom-warning',
+  'story-bathroom-failure',
+  'story-corridor-ring',
+  'story-corridor-prediction',
+  'story-corridor-failure',
+] as const;
+
+export type StoryAudioCueId = (typeof STORY_AUDIO_CUE_IDS)[number];
+
 export const AUDIO_CUE_IDS = [
+  'game-soundtrack',
   'room-ambience',
   'blackout-cue',
   'lights-return',
   'report-correct',
   'report-incorrect',
+  'house-calm',
+  'house-pressure-1',
+  'house-pressure-2',
+  'house-takeover',
+  ...STORY_AUDIO_CUE_IDS,
   'door-unlock',
   'door-open',
 ] as const;
@@ -47,9 +72,6 @@ const DEFAULT_VOLUMES: Readonly<Record<AudioCategory, number>> = {
 };
 
 const ROOM_TONE_SECONDS = 2;
-const VIOLIN_LOOP_SECONDS = 18;
-const VIOLIN_NOTE_DURATION_SECONDS = 9;
-const VIOLIN_NOTE_FREQUENCIES = [220, 146.83] as const;
 const UINT32_RANGE = 4_294_967_296;
 
 export class AudioManager {
@@ -60,6 +82,7 @@ export class AudioManager {
     ...DEFAULT_VOLUMES,
   };
   private readonly activeCues = new Map<AudioCueId, ActiveCue>();
+  private horrorScoreBuffer: AudioBuffer | null = null;
   private muted = false;
   private disposed = false;
 
@@ -94,6 +117,9 @@ export class AudioManager {
     }
 
     switch (id) {
+      case 'game-soundtrack':
+        this.playGameSoundtrack();
+        break;
       case 'room-ambience':
         this.playRoomAmbience();
         break;
@@ -139,6 +165,160 @@ export class AudioManager {
           endFrequency: 92,
           durationSeconds: 0.11,
           maximumVolume: 0.025,
+        });
+        break;
+      case 'house-calm':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'sine',
+          startFrequency: 235,
+          endFrequency: 390,
+          durationSeconds: 0.24,
+          maximumVolume: 0.018,
+        });
+        break;
+      case 'house-pressure-1':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'triangle',
+          startFrequency: 82,
+          endFrequency: 54,
+          durationSeconds: 0.42,
+          maximumVolume: 0.025,
+        });
+        break;
+      case 'house-pressure-2':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'sawtooth',
+          startFrequency: 104,
+          endFrequency: 38,
+          durationSeconds: 0.68,
+          maximumVolume: 0.018,
+        });
+        break;
+      case 'house-takeover':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'sawtooth',
+          startFrequency: 69,
+          endFrequency: 24,
+          durationSeconds: 1.45,
+          maximumVolume: 0.026,
+        });
+        break;
+      case 'story-radio-burst':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'sawtooth',
+          startFrequency: 1_240,
+          endFrequency: 178,
+          durationSeconds: 0.62,
+          maximumVolume: 0.012,
+        });
+        break;
+      case 'story-photo-memory':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'sine',
+          startFrequency: 510,
+          endFrequency: 335,
+          durationSeconds: 0.38,
+          maximumVolume: 0.022,
+        });
+        break;
+      case 'story-radio-message':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'triangle',
+          startFrequency: 225,
+          endFrequency: 112,
+          durationSeconds: 1.35,
+          maximumVolume: 0.025,
+        });
+        break;
+      case 'story-radio-search':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'sawtooth',
+          startFrequency: 1_850,
+          endFrequency: 43,
+          durationSeconds: 2.75,
+          maximumVolume: 0.014,
+        });
+        break;
+      case 'story-bathroom-pipes':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'triangle',
+          startFrequency: 118,
+          endFrequency: 47,
+          durationSeconds: 1.6,
+          maximumVolume: 0.018,
+        });
+        break;
+      case 'story-bathroom-warning':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'sine',
+          startFrequency: 390,
+          endFrequency: 96,
+          durationSeconds: 1.25,
+          maximumVolume: 0.02,
+        });
+        break;
+      case 'story-bathroom-failure':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'sawtooth',
+          startFrequency: 156,
+          endFrequency: 31,
+          durationSeconds: 2.9,
+          maximumVolume: 0.014,
+        });
+        break;
+      case 'story-corridor-ring':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'square',
+          startFrequency: 510,
+          endFrequency: 430,
+          durationSeconds: 2.8,
+          maximumVolume: 0.018,
+        });
+        break;
+      case 'story-corridor-prediction':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'triangle',
+          startFrequency: 172,
+          endFrequency: 61,
+          durationSeconds: 2.2,
+          maximumVolume: 0.02,
+        });
+        break;
+      case 'story-corridor-failure':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'square',
+          startFrequency: 620,
+          endFrequency: 74,
+          durationSeconds: 3.05,
+          maximumVolume: 0.022,
         });
         break;
       case 'door-unlock':
@@ -236,6 +416,7 @@ export class AudioManager {
     this.categoryGains.clear();
     this.masterGain?.disconnect();
     this.masterGain = null;
+    this.horrorScoreBuffer = null;
 
     if (this.context !== null && this.context.state !== 'closed') {
       await this.context.close();
@@ -286,7 +467,7 @@ export class AudioManager {
       return;
     }
 
-    const destination = this.requireCategoryGain('ambience');
+    const ambienceDestination = this.requireCategoryGain('ambience');
     const roomTone = context.createBufferSource();
     const roomToneFilter = context.createBiquadFilter();
     const roomToneGain = context.createGain();
@@ -294,8 +475,6 @@ export class AudioManager {
     const electricalHumGain = context.createGain();
     const upperHum = context.createOscillator();
     const upperHumGain = context.createGain();
-    const violinNotes = context.createBufferSource();
-    const violinGain = context.createGain();
     const now = context.currentTime;
 
     roomTone.buffer = this.createRoomToneBuffer(context);
@@ -310,23 +489,17 @@ export class AudioManager {
     upperHum.type = 'sine';
     upperHum.frequency.setValueAtTime(160, now);
     upperHumGain.gain.setValueAtTime(0.0035, now);
-    violinNotes.buffer = this.createViolinAmbienceBuffer(context);
-    violinNotes.loop = true;
-    violinGain.gain.setValueAtTime(0.055, now);
-
     roomTone.connect(roomToneFilter);
     roomToneFilter.connect(roomToneGain);
-    roomToneGain.connect(destination);
+    roomToneGain.connect(ambienceDestination);
     electricalHum.connect(electricalHumGain);
-    electricalHumGain.connect(destination);
+    electricalHumGain.connect(ambienceDestination);
     upperHum.connect(upperHumGain);
-    upperHumGain.connect(destination);
-    violinNotes.connect(violinGain);
-    violinGain.connect(destination);
+    upperHumGain.connect(ambienceDestination);
 
     this.activateCue(
       'room-ambience',
-      [roomTone, electricalHum, upperHum, violinNotes],
+      [roomTone, electricalHum, upperHum],
       [
         roomTone,
         roomToneFilter,
@@ -335,14 +508,41 @@ export class AudioManager {
         electricalHumGain,
         upperHum,
         upperHumGain,
-        violinNotes,
-        violinGain,
       ],
     );
     roomTone.start(now);
     electricalHum.start(now);
     upperHum.start(now);
-    violinNotes.start(now);
+  }
+
+  private playGameSoundtrack(): void {
+    const context = this.context;
+
+    if (context === null || this.activeCues.has('game-soundtrack')) {
+      return;
+    }
+
+    const horrorScore = context.createBufferSource();
+    const horrorScoreFilter = context.createBiquadFilter();
+    const horrorScoreGain = context.createGain();
+    const now = context.currentTime;
+
+    horrorScore.buffer = this.getHorrorScoreBuffer(context);
+    horrorScore.loop = true;
+    horrorScoreFilter.type = 'lowpass';
+    horrorScoreFilter.frequency.setValueAtTime(3_400, now);
+    horrorScoreFilter.Q.setValueAtTime(0.45, now);
+    horrorScoreGain.gain.setValueAtTime(0.16, now);
+    horrorScore.connect(horrorScoreFilter);
+    horrorScoreFilter.connect(horrorScoreGain);
+    horrorScoreGain.connect(this.requireCategoryGain('music'));
+
+    this.activateCue(
+      'game-soundtrack',
+      [horrorScore],
+      [horrorScore, horrorScoreFilter, horrorScoreGain],
+    );
+    horrorScore.start(now);
   }
 
   private createRoomToneBuffer(context: AudioContext): AudioBuffer {
@@ -362,49 +562,13 @@ export class AudioManager {
     return buffer;
   }
 
-  private createViolinAmbienceBuffer(context: AudioContext): AudioBuffer {
-    const frameCount = Math.max(
-      1,
-      Math.floor(context.sampleRate * VIOLIN_LOOP_SECONDS),
-    );
-    const buffer = context.createBuffer(1, frameCount, context.sampleRate);
-    const samples = buffer.getChannelData(0);
-
-    for (const [noteIndex, frequency] of VIOLIN_NOTE_FREQUENCIES.entries()) {
-      const noteStartsAt = noteIndex * (VIOLIN_LOOP_SECONDS / 2);
-
-      for (let frame = 0; frame < samples.length; frame += 1) {
-        const elapsed = frame / context.sampleRate - noteStartsAt;
-
-        if (elapsed < 0 || elapsed >= VIOLIN_NOTE_DURATION_SECONDS) {
-          continue;
-        }
-
-        const attack = Math.min(1, elapsed / 0.75);
-        const finalFade = Math.min(
-          1,
-          (VIOLIN_NOTE_DURATION_SECONDS - elapsed) / 1.4,
-        );
-        const decay = Math.exp(-elapsed * 0.035);
-        const envelope = attack * finalFade * decay;
-        const vibrato = Math.sin(Math.PI * 2 * 5.1 * elapsed) * 0.24;
-        const phase = Math.PI * 2 * frequency * elapsed + vibrato;
-        const tone =
-          Math.sin(phase) * 0.46 +
-          Math.sin(phase * 2.001) * 0.25 +
-          Math.sin(phase * 3.004) * 0.15 +
-          Math.sin(phase * 4.008) * 0.09 +
-          Math.sin(phase * 5.013) * 0.05;
-
-        samples[frame] = (samples[frame] ?? 0) + tone * envelope;
-      }
-    }
-
-    return buffer;
+  private getHorrorScoreBuffer(context: AudioContext): AudioBuffer {
+    this.horrorScoreBuffer ??= createProceduralHorrorScore(context);
+    return this.horrorScoreBuffer;
   }
 
   private playToneCue(options: {
-    readonly id: Exclude<AudioCueId, 'room-ambience'>;
+    readonly id: Exclude<AudioCueId, 'game-soundtrack' | 'room-ambience'>;
     readonly category: RoutedAudioCategory;
     readonly type: OscillatorType;
     readonly startFrequency: number;

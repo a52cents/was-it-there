@@ -193,6 +193,19 @@ describe('GreyboxBathroom', () => {
         ?.object.quaternion.toArray(),
     ).toEqual([0, 0.9990482215818578, 0, 0.04361938736533601]);
 
+    expect(room.isStoryMirrorFogVisible()).toBe(false);
+    expect(room.setStoryMirrorFogVisible(true)).toBe(true);
+    const mirrorFog = room
+      .getAnomalyTargetRegistry()
+      .getById('mirror')
+      ?.object.getObjectByName('STORY_BathroomMirrorFog');
+    expect(mirrorFog).toBeDefined();
+    expect(mirrorFog?.visible).toBe(true);
+    expect(mirrorFog?.layers.isEnabled(RENDER_LAYERS.scene)).toBe(true);
+    expect(mirrorFog?.layers.isEnabled(RENDER_LAYERS.interaction)).toBe(false);
+    expect(room.setStoryMirrorFogVisible(false)).toBe(true);
+    expect(room.isStoryMirrorFogVisible()).toBe(false);
+
     for (const targetId of ['vanity', 'toilet'] as const) {
       const target = room.getAnomalyTargetRegistry().getById(targetId);
       const model = target?.object.getObjectByName(
@@ -207,12 +220,23 @@ describe('GreyboxBathroom', () => {
       expect(bounds.min.y).toBeCloseTo(target.object.position.y);
     }
 
-    expect(
-      room
-        .getAnomalyTargetRegistry()
-        .getById('bin')
-        ?.variants.some((variant) => variant.kind === 'rotate'),
-    ).toBe(false);
+    for (const targetId of [
+      'bin',
+      'plant',
+      'soap-dish',
+      'slippers',
+      'toothbrush-cup',
+      'toilet-roll-holder',
+      'toilet-rolls',
+    ]) {
+      expect(
+        room
+          .getAnomalyTargetRegistry()
+          .getById(targetId)
+          ?.variants.some((variant) => variant.kind === 'rotate'),
+        targetId,
+      ).toBe(false);
+    }
 
     for (const targetId of ['towel', 'towels-stacked']) {
       expect(

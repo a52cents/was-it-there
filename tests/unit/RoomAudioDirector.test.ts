@@ -14,14 +14,20 @@ function createHarness() {
 }
 
 describe('RoomAudioDirector', () => {
-  it('starts and stops the continuous bedroom ambience', () => {
+  it('keeps the soundtrack continuous while changing room ambience', () => {
     const { audio, director } = createHarness();
 
     director.startRoom();
     director.finishRoom();
+    director.startRoom();
 
-    expect(audio.play).toHaveBeenCalledWith('room-ambience');
-    expect(audio.stop).toHaveBeenCalledWith('room-ambience');
+    expect(audio.play.mock.calls).toEqual([
+      ['game-soundtrack'],
+      ['room-ambience'],
+      ['game-soundtrack'],
+      ['room-ambience'],
+    ]);
+    expect(audio.stop.mock.calls).toEqual([['room-ambience']]);
   });
 
   it('plays one light-return cue per blackout', () => {
@@ -62,6 +68,7 @@ describe('RoomAudioDirector', () => {
 
     expect(audio.stop.mock.calls).toEqual([
       ['room-ambience'],
+      ['game-soundtrack'],
       ['blackout-cue'],
       ['lights-return'],
       ['door-unlock'],

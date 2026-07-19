@@ -11,6 +11,14 @@ function getGameAppElements(): GameAppElements {
   const modalLayer = document.querySelector('#modal-layer');
   const title = document.querySelector('#game-title');
   const playButton = document.querySelector('#play-button');
+  const storyModeButton = document.querySelector('#story-mode-button');
+  const escapeModeButton = document.querySelector('#escape-mode-button');
+  const escapeModeDescription = document.querySelector(
+    '#escape-mode-description',
+  );
+  const storyNotebookButton = document.querySelector(
+    '#story-notebook-button',
+  );
   const pointerLockPrompt = document.querySelector('#pointer-lock-prompt');
 
   if (!(canvas instanceof HTMLCanvasElement)) {
@@ -37,6 +45,22 @@ function getGameAppElements(): GameAppElements {
     throw new Error('Missing #play-button element.');
   }
 
+  if (!(storyModeButton instanceof HTMLButtonElement)) {
+    throw new Error('Missing #story-mode-button element.');
+  }
+
+  if (!(escapeModeButton instanceof HTMLButtonElement)) {
+    throw new Error('Missing #escape-mode-button element.');
+  }
+
+  if (!(escapeModeDescription instanceof HTMLElement)) {
+    throw new Error('Missing #escape-mode-description element.');
+  }
+
+  if (!(storyNotebookButton instanceof HTMLButtonElement)) {
+    throw new Error('Missing #story-notebook-button element.');
+  }
+
   if (!(pointerLockPrompt instanceof HTMLButtonElement)) {
     throw new Error('Missing #pointer-lock-prompt element.');
   }
@@ -48,6 +72,10 @@ function getGameAppElements(): GameAppElements {
     modalLayer,
     title,
     playButton,
+    storyModeButton,
+    escapeModeButton,
+    escapeModeDescription,
+    storyNotebookButton,
     pointerLockPrompt,
   };
 }

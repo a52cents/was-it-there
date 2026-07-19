@@ -29,7 +29,7 @@ export interface EscapeRoomStep {
 export const ESCAPE_ROUTE = [
   createStep(0, 'greybox-bedroom', 'Bedroom', 'introduction', 1, 10, 30, 1, 1),
   createStep(1, 'bathroom', 'Bathroom', 'easy', 1, 10, 30, 1, 1),
-  createStep(2, 'first-corridor', 'Corridor', 'easy', 2, 20, 45, 2, 2),
+  createStep(2, 'first-corridor', 'Corridor', 'easy', 2, 15, 45, 2, 2),
   createStep(3, 'office', 'Office', 'moderate', 2, 15, 30, 1, 2),
   createStep(4, 'kitchen', 'Kitchen', 'moderate', 3, 13, 28, 2, 2),
   createStep(5, 'dining-room', 'Dining Room', 'moderate', 3, 13, 28, 2, 2),

@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { AudioManager } from '../audio/AudioManager';
 import { RoomAudioDirector } from '../audio/RoomAudioDirector';
 import { deriveRoomSeed } from '../core/random/SeededRandom';
+import { STORY_EVENT_CATALOG } from '../content/story/StoryEventCatalog';
+import { STORY_INTERACTION_CATALOG } from '../content/story/StoryInteractionCatalog';
 import { GreyboxDebugRuntime } from '../debug/GreyboxDebugRuntime';
 import { parseLevelBuilderDocument } from '../debug/level-builder/LevelBuilderDocument';
 import {
@@ -9,7 +11,7 @@ import {
   type BlackoutSnapshot,
 } from '../gameplay/anomalies/BlackoutTimeline';
 import type { AnomalyPlan } from '../gameplay/anomalies/AnomalyGenerator';
-import { describeFirstAnomaly } from '../gameplay/anomalies/AnomalyPresentation';
+import { describeMissedAnomalyForMode } from '../gameplay/anomalies/AnomalyPresentation';
 import { RoomAnomalySystem } from '../gameplay/anomalies/RoomAnomalySystem';
 import { AnomalyTargetSelector } from '../gameplay/interaction/AnomalyTargetSelector';
 import { RoomReportSystem } from '../gameplay/interaction/RoomReportSystem';
@@ -24,37 +26,63 @@ import {
   createRunIdentity,
   type RunIdentity,
 } from '../gameplay/run/RunIdentity';
+import type { GameMode } from '../gameplay/run/GameMode';
 import {
   RunErrorTracker,
   type RunErrorKind,
 } from '../gameplay/run/RunErrorTracker';
+import { StoryDirector } from '../gameplay/story/StoryDirector';
+import { StoryEffectRuntime } from '../gameplay/story/StoryEffectRuntime';
+import { StoryExitGate } from '../gameplay/story/StoryExitGate';
+import {
+  HousePressureSystem,
+  type HousePressureSnapshot,
+} from '../gameplay/story/HousePressureSystem';
+import { StoryProgress } from '../gameplay/story/StoryProgress';
+import {
+  StorySaveRepository,
+  createEmptyStoryProgress,
+} from '../gameplay/story/StorySaveRepository';
+import {
+  StoryInteractionRegistry,
+  type StoryInteractionDefinition,
+} from '../gameplay/story/StoryInteraction';
 import { DesktopInput } from '../input/DesktopInput';
 import { InputManager } from '../input/InputManager';
 import type { PlatformManager } from '../platform/PlatformManager';
 import { PlayerController } from '../player/PlayerController';
 import { CameraManager } from '../rendering/CameraManager';
+import { HousePressureLighting } from '../rendering/HousePressureLighting';
 import { RendererManager } from '../rendering/RendererManager';
 import { PhaseTimerDisplay } from '../ui/PhaseTimerDisplay';
 import { BlackoutView } from '../ui/BlackoutView';
 import { GameOverScreen } from '../ui/GameOverScreen';
+import { HousePressureView } from '../ui/HousePressureView';
 import { PauseScreen } from '../ui/PauseScreen';
 import { ReportHud } from '../ui/ReportHud';
 import { RoomCompleteBanner } from '../ui/RoomCompleteBanner';
 import { StartScreen } from '../ui/StartScreen';
+import { StoryIntroScreen } from '../ui/StoryIntroScreen';
+import { StoryMemoryView } from '../ui/StoryMemoryView';
+import { StoryNotebookScreen } from '../ui/StoryNotebookScreen';
+import { StorySubtitleView } from '../ui/StorySubtitleView';
 import { VictoryScreen } from '../ui/VictoryScreen';
 import { AssetManager } from '../world/assets/AssetManager';
 import { GreyboxBathroom } from '../world/rooms/GreyboxBathroom';
 import { GreyboxBedroom } from '../world/rooms/GreyboxBedroom';
 import { GreyboxCorridor } from '../world/rooms/GreyboxCorridor';
+import { GreyboxOffice } from '../world/rooms/GreyboxOffice';
 import type { PlayableRoom } from '../world/rooms/PlayableRoom';
 import { RoomPreloader } from '../world/RoomPreloader';
 import bathroomAnomalyCatalog from '../world/rooms/greybox-bathroom-anomalies.json';
 import bedroomAnomalyCatalog from '../world/rooms/greybox-bedroom-anomalies.json';
 import corridorAnomalyCatalog from '../world/rooms/first-corridor-anomalies.json';
+import officeAnomalyCatalog from '../world/rooms/office-anomalies.json';
 import { WorldCollision } from '../world/WorldCollision';
 import { GameLoop } from './GameLoop';
 import {
   GameStateMachine,
+  type GameState,
   type GameStateTransition,
 } from './GameStateMachine';
 import { RunTimer } from './RunTimer';
@@ -66,6 +94,10 @@ export interface GameAppElements {
   readonly modalLayer: HTMLElement;
   readonly title: HTMLHeadingElement;
   readonly playButton: HTMLButtonElement;
+  readonly storyModeButton: HTMLButtonElement;
+  readonly escapeModeButton: HTMLButtonElement;
+  readonly escapeModeDescription: HTMLElement;
+  readonly storyNotebookButton: HTMLButtonElement;
   readonly pointerLockPrompt: HTMLButtonElement;
 }
 
@@ -87,9 +119,15 @@ export class GameApp {
   private readonly rendererManager: RendererManager;
   private readonly gameLoop: GameLoop;
   private readonly startScreen: StartScreen;
+  private readonly storyIntroScreen: StoryIntroScreen;
   private readonly pauseScreen: PauseScreen;
   private readonly phaseTimerDisplay: PhaseTimerDisplay;
   private readonly blackoutView: BlackoutView;
+  private readonly housePressureView: HousePressureView;
+  private readonly storySubtitleView: StorySubtitleView;
+  private readonly storyMemoryView: StoryMemoryView;
+  private readonly storyNotebookScreen: StoryNotebookScreen;
+  private readonly storyEffectRuntime: StoryEffectRuntime;
   private readonly reportHud: ReportHud;
   private readonly roomCompleteBanner: RoomCompleteBanner;
   private readonly gameOverScreen: GameOverScreen;
@@ -109,6 +147,18 @@ export class GameApp {
     },
   );
   private readonly roomProgression = new EscapeRouteProgression();
+  private readonly storyProgress = new StoryProgress();
+  private readonly storyInteractionRegistry = new StoryInteractionRegistry(
+    STORY_INTERACTION_CATALOG,
+  );
+  private readonly storyExitGate = new StoryExitGate(
+    this.storyInteractionRegistry,
+    this.storyProgress,
+  );
+  private readonly storyDirector: StoryDirector;
+  private readonly storySaveRepository = new StorySaveRepository();
+  private readonly housePressureSystem = new HousePressureSystem();
+  private readonly housePressureLighting = new HousePressureLighting();
   private room: PlayableRoom;
   private targetSelector: AnomalyTargetSelector;
   private anomalySystem: RoomAnomalySystem;
@@ -118,12 +168,14 @@ export class GameApp {
   private exitDoorController: ExitDoorController;
   private exitThresholdDetector: ExitThresholdDetector;
   private readonly unsubscribeGameState: () => void;
+  private unsubscribeStoryProgress: (() => void) | null = null;
 
   private initialized = false;
   private destroyed = false;
   private experienceStarted = false;
   private gameplayActive = false;
   private aimedTargetId: string | null = null;
+  private aimedStoryInteraction: StoryInteractionDefinition | null = null;
   private lastSelectedTargetId: string | null = null;
   private runIdentity: RunIdentity | null = null;
   private pendingAnomalyPlan: AnomalyPlan | null = null;
@@ -177,19 +229,50 @@ export class GameApp {
       elements.menuLayer,
       elements.title,
       elements.playButton,
+      elements.storyModeButton,
+      elements.escapeModeButton,
+      elements.escapeModeDescription,
+      elements.storyNotebookButton,
     );
+    this.storyIntroScreen = new StoryIntroScreen(elements.modalLayer);
     this.pauseScreen = new PauseScreen(
       elements.modalLayer,
       elements.pointerLockPrompt,
+      this.handleOpenNotebookFromPause,
     );
+    this.storyNotebookScreen = new StoryNotebookScreen(
+      elements.modalLayer,
+    );
+    this.storyNotebookScreen.onErase(this.handleEraseStoryProgress);
     this.phaseTimerDisplay = new PhaseTimerDisplay(elements.hudLayer);
     this.blackoutView = new BlackoutView(elements.hudLayer);
+    this.housePressureView = new HousePressureView(elements.hudLayer);
+    this.storySubtitleView = new StorySubtitleView(elements.hudLayer);
+    this.storyMemoryView = new StoryMemoryView(elements.hudLayer);
+    this.storyEffectRuntime = new StoryEffectRuntime(
+      this.audioManager,
+      this.storySubtitleView,
+      this.storyMemoryView,
+      {
+        onHelperVisibility: (bindingId, visible) =>
+          this.setStoryHelperVisibility(bindingId, visible),
+      },
+    );
+    this.storyDirector = new StoryDirector(
+      STORY_EVENT_CATALOG,
+      this.storyProgress,
+      {
+        onEffect: (execution) => this.storyEffectRuntime.execute(execution),
+        onRoomExited: () => this.storyEffectRuntime.reset(),
+      },
+    );
     this.reportHud = new ReportHud(elements.hudLayer);
     this.roomCompleteBanner = new RoomCompleteBanner(elements.hudLayer);
     this.gameOverScreen = new GameOverScreen(elements.modalLayer);
     this.gameOverScreen.onTryAgain(() => this.tryAgain());
     this.victoryScreen = new VictoryScreen(elements.modalLayer);
     this.victoryScreen.onPlayAgain(() => this.playAgain());
+    this.victoryScreen.onReturnToMenu(() => this.returnToModeSelect());
     this.unsubscribeGameState = this.gameStateMachine.subscribe(
       this.handleGameStateTransition,
     );
@@ -221,6 +304,10 @@ export class GameApp {
       'click',
       this.handleResumeClick,
     );
+    elements.storyNotebookButton.addEventListener(
+      'click',
+      this.handleOpenNotebookFromMenu,
+    );
   }
 
   public async initialize(): Promise<void> {
@@ -240,10 +327,20 @@ export class GameApp {
 
     try {
       await this.room.loadAssets(this.assetManager);
+      this.housePressureLighting.bind(this.room.getVisualRoot());
       this.registerActiveRoomCatalog();
       this.rendererManager.resize();
       this.desktopInput.attach();
-      this.startScreen.onStart(() => this.startExperience());
+      this.startScreen.onStart((mode) => this.startExperience(mode));
+      const storySave = this.storySaveRepository.load();
+      this.storyProgress.hydrate(storySave.progress);
+      this.unsubscribeStoryProgress = this.storyProgress.subscribe(
+        (progress) => {
+          this.storySaveRepository.saveProgress(progress);
+          this.storyNotebookScreen.refresh(progress);
+        },
+      );
+      this.startScreen.setEscapeUnlocked(storySave.escapeUnlocked);
       this.gameStateMachine.transitionTo('main-menu');
       this.render();
       this.initialized = true;
@@ -263,9 +360,15 @@ export class GameApp {
     this.setGameplayActive(false);
     this.gameLoop.stop();
     this.startScreen.dispose();
+    this.storyIntroScreen.dispose();
     this.pauseScreen.dispose();
+    this.storyNotebookScreen.dispose();
     this.phaseTimerDisplay.dispose();
     this.blackoutView.dispose();
+    this.housePressureView.dispose();
+    this.storyEffectRuntime.reset();
+    this.storySubtitleView.dispose();
+    this.storyMemoryView.dispose();
     this.reportHud.dispose();
     this.roomCompleteBanner.dispose();
     this.gameOverScreen.dispose();
@@ -275,7 +378,11 @@ export class GameApp {
     this.roomPreloader.dispose();
     this.desktopInput.detach();
     this.unsubscribeGameState();
+    this.unsubscribeStoryProgress?.();
+    this.unsubscribeStoryProgress = null;
     this.runTimer.stop();
+    this.storyDirector.stop();
+    this.housePressureLighting.release();
     this.blackoutTimeline.reset();
     this.roomAudioDirector.reset();
     this.anomalySystem.restore();
@@ -287,13 +394,17 @@ export class GameApp {
       'click',
       this.handleResumeClick,
     );
+    this.elements.storyNotebookButton.removeEventListener(
+      'click',
+      this.handleOpenNotebookFromMenu,
+    );
     this.room.unmount();
     this.rendererManager.dispose();
 
     this.scene.clear();
   }
 
-  private async startExperience(): Promise<void> {
+  private async startExperience(mode: GameMode): Promise<void> {
     if (
       this.destroyed ||
       this.gameStateMachine.currentState !== 'main-menu'
@@ -301,8 +412,19 @@ export class GameApp {
       return;
     }
 
+    if (mode === 'story') {
+      await this.storyIntroScreen.present();
+
+      if (
+        this.destroyed ||
+        this.gameStateMachine.currentState !== 'main-menu'
+      ) {
+        return;
+      }
+    }
+
     this.experienceStarted = true;
-    this.prepareNewRun();
+    this.prepareNewRun(mode);
     this.gameStateMachine.transitionTo('room-intro');
     this.resetPlayer();
     this.rendererManager.resize();
@@ -317,6 +439,7 @@ export class GameApp {
     if (
       this.debugRuntime?.isLevelBuilderOpen() === true ||
       this.gameStateMachine.currentState === 'blackout' ||
+      this.gameStateMachine.currentState === 'failure-sequence' ||
       this.gameStateMachine.currentState === 'game-over' ||
       this.gameStateMachine.currentState === 'victory'
     ) {
@@ -332,8 +455,27 @@ export class GameApp {
     }
 
     const state = this.gameStateMachine.currentState;
+    if (state !== 'failure-sequence') {
+      const deltaMs = deltaSeconds * 1_000;
+      this.storyDirector.update(deltaMs);
+      this.storyEffectRuntime.update(deltaMs);
+    }
 
-    if (state !== 'blackout' && state !== 'room-transition') {
+    const housePressure = this.housePressureSystem.update(
+      deltaSeconds * 1_000,
+    );
+    this.applyHousePressure(housePressure);
+
+    if (state === 'failure-sequence' && housePressure.failureComplete) {
+      this.gameStateMachine.transitionTo('game-over');
+      return;
+    }
+
+    if (
+      state !== 'blackout' &&
+      state !== 'room-transition' &&
+      state !== 'failure-sequence'
+    ) {
       this.playerController.fixedUpdate(deltaSeconds);
     }
 
@@ -355,6 +497,7 @@ export class GameApp {
 
       if (
         door.state === 'open' &&
+        !this.storyEffectRuntime.isRoomExitHeld() &&
         this.exitThresholdDetector.hasCrossed(
           this.playerController.getPosition(),
         )
@@ -396,6 +539,7 @@ export class GameApp {
     this.updateBlackout();
     if (levelBuilderOpen) {
       this.aimedTargetId = null;
+      this.aimedStoryInteraction = null;
       this.targetReportHighlight.setAimedTarget(null);
     } else {
       this.updateTargetSelection();
@@ -405,6 +549,7 @@ export class GameApp {
     this.phaseTimerDisplay.update(
       this.gameStateMachine.currentState,
       this.runTimer.getSnapshot(),
+      this.getStoryObservationInstruction(),
     );
     const reportSnapshot = this.reportSystem.getSnapshot();
     const errorSnapshot = this.runErrorTracker.getSnapshot();
@@ -412,6 +557,8 @@ export class GameApp {
       state: this.gameStateMachine.currentState,
       remainingCount: reportSnapshot.remainingCount,
       aimedAtTarget: this.aimedTargetId !== null,
+      storyInteractionLabel:
+        this.aimedStoryInteraction?.actionLabel ?? null,
       errorCount: errorSnapshot.errorCount,
       maximumErrors: errorSnapshot.maximumErrors,
     });
@@ -424,8 +571,26 @@ export class GameApp {
   private resetPlayer(): void {
     this.inputManager.reset();
     this.aimedTargetId = null;
+    this.aimedStoryInteraction = null;
     this.lastSelectedTargetId = null;
     this.playerController.reset(this.room.getPlayerSpawn());
+  }
+
+  private applyHousePressure(snapshot: HousePressureSnapshot): void {
+    this.housePressureLighting.apply(snapshot);
+    this.housePressureView.apply(snapshot);
+  }
+
+  private setStoryHelperVisibility(
+    bindingId: string,
+    visible: boolean,
+  ): void {
+    if (
+      bindingId === 'bathroom-mirror-fog' &&
+      this.room instanceof GreyboxBathroom
+    ) {
+      this.room.setStoryMirrorFogVisible(visible);
+    }
   }
 
   private configureRoomGameplaySystems(room: PlayableRoom): void {
@@ -454,6 +619,7 @@ export class GameApp {
       bathroom: bathroomAnomalyCatalog,
       'first-corridor': corridorAnomalyCatalog,
       'greybox-bedroom': bedroomAnomalyCatalog,
+      office: officeAnomalyCatalog,
     } as const;
     const catalog = catalogs[this.room.definition.id as keyof typeof catalogs];
 
@@ -499,8 +665,10 @@ export class GameApp {
     const nextRoomIndex = this.roomProgression.currentStep.roomIndex + 1;
     let nextRoom: PlayableRoom | null = null;
     this.setGameplayActive(false);
+    this.storyDirector.leaveRoom();
     this.roomCompleteBanner.reset();
     this.roomAudioDirector.finishRoom();
+    this.housePressureLighting.release();
     this.blackoutView.begin(previousRoom.getVisualRoot());
     this.blackoutView.apply({
       stage: 'full-black',
@@ -576,20 +744,19 @@ export class GameApp {
     this.pendingAnomalyPlan = null;
     this.anomalyAppliedDuringBlackout = false;
     this.exitDoorController.reset();
-    this.anomalySystem.prepareRunBaseline({
-      runSeed,
-      roomIndex: this.roomProgression.currentStep.roomIndex,
-      roomId: this.roomProgression.currentStep.id,
-    });
+    this.prepareAnomalyBaseline(runSeed);
     this.rendererManager.invalidateShadows();
   }
 
   private finishRoomTransition(): void {
+    this.housePressureLighting.bind(this.room.getVisualRoot());
+    this.applyHousePressure(this.housePressureSystem.getSnapshot());
     this.resetPlayer();
     this.blackoutView.reset();
     this.roomAudioDirector.startRoom();
     this.debugRuntime = this.createDebugRuntime();
     this.preloadNextBuiltRoom();
+    this.storyDirector.enterRoom(this.room.definition.id);
     this.gameStateMachine.transitionTo('room-intro');
 
     if (this.desktopInput.isPointerLocked()) {
@@ -609,11 +776,15 @@ export class GameApp {
       return new GreyboxCorridor();
     }
 
+    if (roomIndex === 3) {
+      return new GreyboxOffice();
+    }
+
     throw new Error(`Room ${roomIndex + 1} has not been built yet.`);
   }
 
   private isRoomBuilt(roomIndex: number): boolean {
-    return roomIndex >= 0 && roomIndex <= 2;
+    return roomIndex >= 0 && roomIndex <= 3;
   }
 
   private preloadNextBuiltRoom(): void {
@@ -690,8 +861,12 @@ export class GameApp {
   }
 
   private updateTargetSelection(): void {
-    if (this.gameStateMachine.currentState === 'blackout') {
+    if (
+      this.gameStateMachine.currentState === 'blackout' ||
+      this.gameStateMachine.currentState === 'failure-sequence'
+    ) {
       this.aimedTargetId = null;
+      this.aimedStoryInteraction = null;
       this.targetReportHighlight.setAimedTarget(null);
       return;
     }
@@ -704,6 +879,10 @@ export class GameApp {
         this.reportSystem.isTargetSelectable(candidate.id),
     );
     this.aimedTargetId = target?.id ?? null;
+    this.aimedStoryInteraction = this.resolveStoryInteraction(
+      state,
+      this.aimedTargetId,
+    );
     this.targetReportHighlight.setAimedTarget(
       state === 'search' ? (target?.object ?? null) : null,
     );
@@ -712,6 +891,22 @@ export class GameApp {
       !this.inputManager.wasActionPressed('interact') ||
       !this.desktopInput.isPointerLocked()
     ) {
+      return;
+    }
+
+    if (this.aimedStoryInteraction !== null) {
+      this.lastSelectedTargetId = this.aimedTargetId;
+      this.storyDirector.emit({
+        type: 'object-examined',
+        objectId: this.aimedStoryInteraction.id,
+      });
+
+      if (
+        state === 'room-complete' &&
+        this.exitDoorController.getSnapshot().state === 'locked'
+      ) {
+        this.tryUnlockRoomExit();
+      }
       return;
     }
 
@@ -735,6 +930,14 @@ export class GameApp {
       this.targetReportHighlight.show(target.object);
       this.reportHud.showFeedback('correct');
       this.audioManager.play('report-correct');
+      this.audioManager.play('house-calm');
+      this.applyHousePressure(
+        this.housePressureSystem.registerCorrectReport(),
+      );
+      this.storyDirector.emit({
+        type: 'correct-report',
+        targetId: target.id,
+      });
 
       if (result.roomComplete) {
         this.gameStateMachine.transitionTo('room-complete');
@@ -744,8 +947,79 @@ export class GameApp {
     }
   }
 
+  private resolveStoryInteraction(
+    state: GameState,
+    targetId: string | null,
+  ): StoryInteractionDefinition | null {
+    if (
+      targetId === null ||
+      this.runIdentity?.mode !== 'story' ||
+      !this.storyDirector.getSnapshot().active ||
+      (state !== 'observation' && state !== 'room-complete')
+    ) {
+      return null;
+    }
+
+    return this.storyInteractionRegistry.resolve(
+      this.room.definition.id,
+      targetId,
+      state,
+    );
+  }
+
+  private tryUnlockRoomExit(): boolean {
+    const requirement = this.getPendingStoryExitRequirement();
+
+    if (requirement !== null) {
+      this.roomCompleteBanner.show({
+        instruction:
+          requirement.exitInstruction ?? 'COMPLETE THE MEMORY',
+        persistent: true,
+      });
+      return false;
+    }
+
+    this.roomCompleteBanner.show();
+
+    if (this.exitDoorController.unlock()) {
+      this.roomAudioDirector.openExitDoor();
+    }
+
+    return true;
+  }
+
+  private getPendingStoryExitRequirement(): StoryInteractionDefinition | null {
+    const mode = this.runIdentity?.mode;
+
+    if (mode === undefined) {
+      return null;
+    }
+
+    return this.storyExitGate.getPendingRequirement(
+      mode,
+      this.room.definition.id,
+    );
+  }
+
+  private getStoryObservationInstruction(): string | undefined {
+    if (this.runIdentity?.mode !== 'story') {
+      return undefined;
+    }
+
+    return this.storyInteractionRegistry.getExitRequirement(
+      this.room.definition.id,
+    )?.exitInstruction;
+  }
+
   private registerRunError(kind: RunErrorKind): void {
     const errorSnapshot = this.runErrorTracker.recordError(kind);
+    this.storyDirector.setPressureLevel(errorSnapshot.errorCount);
+    const pressureSnapshot = this.housePressureSystem.setPressureLevel(
+      errorSnapshot.errorCount,
+    );
+    this.housePressureView.announcePressure(pressureSnapshot.pressureLevel);
+    this.applyHousePressure(pressureSnapshot);
+    this.storyDirector.emit({ type: 'run-error', kind });
     this.runTimer.addPenalty(
       kind === 'incorrect-report' ? 'incorrectReport' : 'timeout',
     );
@@ -755,9 +1029,17 @@ export class GameApp {
     this.audioManager.play('report-incorrect');
 
     if (errorSnapshot.gameOver) {
-      this.gameStateMachine.transitionTo('game-over');
+      this.applyHousePressure(this.housePressureSystem.beginFailure());
+      this.audioManager.play('house-takeover');
+      this.gameStateMachine.transitionTo('failure-sequence');
       return;
     }
+
+    this.audioManager.play(
+      errorSnapshot.errorCount === 1
+        ? 'house-pressure-1'
+        : 'house-pressure-2',
+    );
 
     if (kind === 'timeout') {
       this.runTimer.startPhase(
@@ -767,7 +1049,7 @@ export class GameApp {
     }
   }
 
-  private prepareNewRun(): void {
+  private prepareNewRun(mode: GameMode): void {
     this.roomProgression.reset();
 
     if (this.room.definition.id !== this.roomProgression.currentStep.id) {
@@ -779,6 +1061,10 @@ export class GameApp {
     this.roomAudioDirector.reset();
     this.blackoutTimeline.reset();
     this.blackoutView.reset();
+    this.storyEffectRuntime.reset();
+    this.housePressureSystem.reset();
+    this.housePressureView.reset();
+    this.housePressureLighting.bind(this.room.getVisualRoot());
     this.reportHud.reset();
     this.roomCompleteBanner.reset();
     this.reportSystem.reset();
@@ -791,16 +1077,16 @@ export class GameApp {
     this.runTimer.reset();
     this.pendingAnomalyPlan = null;
     this.anomalyAppliedDuringBlackout = false;
-    this.runIdentity = createRunIdentity(
-      this.nextRunSeedOverride ?? undefined,
-    );
-    this.anomalySystem.prepareRunBaseline({
-      runSeed: this.runIdentity.seed,
-      roomIndex: this.roomProgression.currentStep.roomIndex,
-      roomId: this.roomProgression.currentStep.id,
-    });
+    const identityOptions =
+      this.nextRunSeedOverride === null
+        ? { mode }
+        : { mode, seed: this.nextRunSeedOverride };
+    this.runIdentity = createRunIdentity(identityOptions);
+    this.storyDirector.beginLoop(mode, this.room.definition.id);
+    this.prepareAnomalyBaseline(this.runIdentity.seed);
     this.preloadNextBuiltRoom();
     this.rendererManager.invalidateShadows();
+    this.applyHousePressure(this.housePressureSystem.getSnapshot());
   }
 
   private async tryAgain(): Promise<void> {
@@ -809,6 +1095,29 @@ export class GameApp {
 
   private async playAgain(): Promise<void> {
     await this.restartFinishedRun('victory');
+  }
+
+  private async returnToModeSelect(): Promise<void> {
+    if (
+      this.destroyed ||
+      this.gameStateMachine.currentState !== 'victory'
+    ) {
+      return;
+    }
+
+    await this.ensureFirstRoomMounted();
+
+    if (
+      this.destroyed ||
+      this.gameStateMachine.currentState !== 'victory'
+    ) {
+      return;
+    }
+
+    this.experienceStarted = false;
+    this.gameStateMachine.transitionTo('main-menu');
+    this.startScreen.show();
+    this.startScreen.setBusy(false);
   }
 
   private async restartFinishedRun(
@@ -821,13 +1130,14 @@ export class GameApp {
       return;
     }
 
+    const mode = this.runIdentity?.mode ?? 'escape';
     await this.ensureFirstRoomMounted();
 
     if (this.destroyed || this.gameStateMachine.currentState !== finishedState) {
       return;
     }
 
-    this.prepareNewRun();
+    this.prepareNewRun(mode);
     this.gameStateMachine.transitionTo('room-intro');
     this.resetPlayer();
     this.rendererManager.resize();
@@ -930,6 +1240,27 @@ export class GameApp {
     }
   }
 
+  private prepareAnomalyBaseline(runSeed: number): void {
+    const requiredVisibleTargetIds =
+      this.getStoryRequiredVisibleTargetIds();
+    this.anomalySystem.prepareRunBaseline({
+      runSeed,
+      roomIndex: this.roomProgression.currentStep.roomIndex,
+      roomId: this.roomProgression.currentStep.id,
+      ...(requiredVisibleTargetIds.length === 0
+        ? {}
+        : { requiredVisibleTargetIds }),
+    });
+  }
+
+  private getStoryRequiredVisibleTargetIds(): readonly string[] {
+    if (this.runIdentity?.mode !== 'story') {
+      return [];
+    }
+
+    return this.room.getAnomalyTargets().map(({ id }) => id);
+  }
+
   private updateBlackout(): void {
     if (this.gameStateMachine.currentState !== 'blackout') {
       return;
@@ -950,6 +1281,7 @@ export class GameApp {
       }
 
       this.blackoutView.apply(createApplicationFrameSnapshot(snapshot));
+      this.resetPlayer();
       this.anomalySystem.applyPlan(plan);
       this.rendererManager.invalidateShadows();
       this.anomalyAppliedDuringBlackout = true;
@@ -1024,6 +1356,27 @@ export class GameApp {
     void this.requestPointerLock();
   };
 
+  private readonly handleOpenNotebookFromMenu = (): void => {
+    this.storyNotebookScreen.show(
+      this.storyProgress.getPersistentSnapshot(),
+      { allowErase: true },
+    );
+  };
+
+  private readonly handleOpenNotebookFromPause = (): void => {
+    this.storyNotebookScreen.show(
+      this.storyProgress.getPersistentSnapshot(),
+      { allowErase: false },
+    );
+  };
+
+  private readonly handleEraseStoryProgress = (): void => {
+    const emptyProgress = createEmptyStoryProgress();
+    this.storySaveRepository.eraseProgressPreservingAccess();
+    this.storyProgress.hydrate(emptyProgress);
+    this.storyNotebookScreen.refresh(emptyProgress);
+  };
+
   private readonly handlePointerLockChange = (locked: boolean): void => {
     if (!this.experienceStarted) {
       return;
@@ -1084,6 +1437,9 @@ export class GameApp {
         this.blackoutTimeline.pause();
       }
 
+      this.storyDirector.pause();
+      this.storyEffectRuntime.pause();
+      this.housePressureSystem.pause();
       this.runTimer.pause();
       void this.audioManager.suspend().catch((error: unknown) => {
         console.warn('Audio could not be suspended cleanly.', error);
@@ -1093,9 +1449,17 @@ export class GameApp {
 
     if (transition.from === 'paused') {
       if (transition.to === 'main-menu') {
+        this.storyDirector.stop();
+        this.storyEffectRuntime.reset();
+        this.housePressureSystem.reset();
+        this.housePressureView.reset();
+        this.housePressureLighting.release();
         this.runTimer.stop();
         this.runTimer.clearPhase();
       } else {
+        this.storyDirector.resume();
+        this.storyEffectRuntime.resume();
+        this.housePressureSystem.resume();
         this.runTimer.resume();
 
         if (transition.to === 'blackout') {
@@ -1107,10 +1471,12 @@ export class GameApp {
 
     switch (transition.to) {
       case 'room-intro':
+        this.storyDirector.startPhase('room-intro');
         this.gameOverScreen.hide();
         this.victoryScreen.hide();
         break;
       case 'observation':
+        this.storyDirector.startPhase('observation');
         if (!this.runTimer.hasStarted || this.runTimer.isFinished) {
           this.runTimer.startRun();
         }
@@ -1120,19 +1486,21 @@ export class GameApp {
         );
         break;
       case 'blackout':
+        this.storyDirector.startPhase('blackout');
+        this.storyEffectRuntime.reset();
         this.runTimer.clearPhase();
         this.blackoutTimeline.start();
         this.blackoutView.begin(this.room.getVisualRoot());
         this.roomAudioDirector.beginBlackout();
         break;
       case 'room-complete':
+        this.storyDirector.startPhase('room-complete');
+        this.storyDirector.emit({ type: 'room-completed' });
         this.runTimer.clearPhase();
-        this.roomCompleteBanner.show();
-        if (this.exitDoorController.unlock()) {
-          this.roomAudioDirector.openExitDoor();
-        }
+        this.tryUnlockRoomExit();
         break;
       case 'search':
+        this.storyDirector.startPhase('search');
         {
           const activePlan = this.anomalySystem.getActivePlan();
 
@@ -1151,13 +1519,34 @@ export class GameApp {
           this.roomProgression.currentStep.searchDurationMs,
         );
         break;
+      case 'failure-sequence':
+        this.runTimer.clearPhase();
+        this.runTimer.stop();
+        this.reportHud.reset();
+        this.setGameplayActive(false);
+        break;
       case 'game-over': {
+        this.housePressureSystem.reset();
+        this.housePressureView.reset();
+        this.housePressureLighting.release();
+        this.storyDirector.emit({ type: 'loop-failed' });
+
+        if (this.runIdentity?.mode === 'story') {
+          this.storyProgress.recordLoopOutcome('failed');
+        }
+
+        this.storyEffectRuntime.reset();
         this.roomCompleteBanner.reset();
         this.runTimer.clearPhase();
         this.runTimer.stop();
         const errors = this.runErrorTracker.getSnapshot();
         const activePlan = this.anomalySystem.getActivePlan();
-        const missedAnomaly = describeFirstAnomaly(activePlan);
+        const missedAnomaly = describeMissedAnomalyForMode(
+          this.runIdentity?.mode ?? 'story',
+          activePlan,
+        );
+        this.gameOverRevealTarget = null;
+        this.targetReportHighlight.reset();
         const revealTarget =
           missedAnomaly === null
             ? null
@@ -1191,6 +1580,19 @@ export class GameApp {
         break;
       }
       case 'victory': {
+        this.housePressureSystem.reset();
+        this.housePressureView.reset();
+        this.housePressureLighting.release();
+        this.storyDirector.emit({ type: 'chapter-completed' });
+        this.storyEffectRuntime.reset();
+
+        if (this.runIdentity?.mode === 'story') {
+          this.storyProgress.recordLoopOutcome('completed');
+          this.storyProgress.addChapterOutcome('chapter-one-complete');
+          this.storySaveRepository.unlockEscape();
+          this.startScreen.setEscapeUnlocked(true);
+        }
+
         this.roomCompleteBanner.reset();
         this.runTimer.clearPhase();
         this.runTimer.stop();
@@ -1204,14 +1606,23 @@ export class GameApp {
         this.roomAudioDirector.finishRoom();
         this.setGameplayActive(false);
         this.desktopInput.releasePointerLock();
-        void this.platformManager.activeAdapter
-          .submitEscapeTime(timing.finalTimeMs)
-          .catch((error: unknown) => {
-            console.warn('Escape time could not be submitted.', error);
-          });
+
+        if (this.runIdentity?.mode === 'escape') {
+          void this.platformManager.activeAdapter
+            .submitEscapeTime(timing.finalTimeMs)
+            .catch((error: unknown) => {
+              console.warn('Escape time could not be submitted.', error);
+            });
+        }
         break;
       }
       case 'main-menu':
+        this.storyDirector.stop();
+        this.storyEffectRuntime.reset();
+        this.housePressureSystem.reset();
+        this.housePressureView.reset();
+        this.housePressureLighting.release();
+        this.storyIntroScreen.hide();
         this.roomCompleteBanner.reset();
         this.gameOverScreen.hide();
         this.victoryScreen.hide();

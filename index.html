@@ -44,8 +44,47 @@
             </p>
           </div>
 
+          <div
+            id="mode-selection"
+            class="start-screen__modes"
+            role="group"
+            aria-label="Game mode"
+          >
+            <button
+              id="story-mode-button"
+              class="mode-option is-selected"
+              type="button"
+              aria-pressed="true"
+              disabled
+            >
+              <strong>STORY</strong>
+              <span>Break the loop. Remember who lived here.</span>
+            </button>
+            <button
+              id="escape-mode-button"
+              class="mode-option"
+              type="button"
+              aria-pressed="false"
+              disabled
+            >
+              <strong>ESCAPE</strong>
+              <span id="escape-mode-description">
+                Complete Story to unlock Escape.
+              </span>
+            </button>
+          </div>
+
           <button id="play-button" type="button" disabled>
             PREPARING THE ROOM
+          </button>
+
+          <button
+            id="story-notebook-button"
+            class="start-screen__secondary-action"
+            type="button"
+            disabled
+          >
+            OPEN NOTEBOOK
           </button>
 
           <div class="start-screen__controls" aria-label="Game controls">

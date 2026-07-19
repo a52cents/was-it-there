@@ -9,6 +9,7 @@ export interface VictorySummary {
 }
 
 type PlayAgainHandler = () => Promise<void> | void;
+type ReturnToMenuHandler = () => Promise<void> | void;
 
 export class VictoryScreen {
   private readonly element: HTMLElement;
@@ -18,7 +19,9 @@ export class VictoryScreen {
   private readonly errors: HTMLElement;
   private readonly perfectRun: HTMLElement;
   private readonly playAgainButton: HTMLButtonElement;
+  private readonly modeSelectButton: HTMLButtonElement;
   private playAgainHandler: PlayAgainHandler | null = null;
+  private returnToMenuHandler: ReturnToMenuHandler | null = null;
   private busy = false;
 
   public constructor(root: HTMLElement) {
@@ -49,6 +52,17 @@ export class VictoryScreen {
     this.playAgainButton.className = 'victory-play-again';
     this.playAgainButton.textContent = ENGLISH_COPY.playAgain;
     this.playAgainButton.addEventListener('click', this.handlePlayAgain);
+    this.modeSelectButton = document.createElement('button');
+    this.modeSelectButton.type = 'button';
+    this.modeSelectButton.className = 'victory-mode-select';
+    this.modeSelectButton.textContent = ENGLISH_COPY.modeSelect;
+    this.modeSelectButton.addEventListener(
+      'click',
+      this.handleReturnToMenu,
+    );
+    const actions = document.createElement('div');
+    actions.className = 'victory-actions';
+    actions.append(this.playAgainButton, this.modeSelectButton);
 
     panel.append(
       title,
@@ -57,7 +71,7 @@ export class VictoryScreen {
       this.finalTime,
       this.errors,
       this.perfectRun,
-      this.playAgainButton,
+      actions,
     );
     this.element.append(panel);
     root.append(this.element);
@@ -65,6 +79,10 @@ export class VictoryScreen {
 
   public onPlayAgain(handler: PlayAgainHandler): void {
     this.playAgainHandler = handler;
+  }
+
+  public onReturnToMenu(handler: ReturnToMenuHandler): void {
+    this.returnToMenuHandler = handler;
   }
 
   public show(summary: VictorySummary): void {
@@ -90,14 +108,21 @@ export class VictoryScreen {
 
   public dispose(): void {
     this.playAgainButton.removeEventListener('click', this.handlePlayAgain);
+    this.modeSelectButton.removeEventListener(
+      'click',
+      this.handleReturnToMenu,
+    );
     this.playAgainHandler = null;
+    this.returnToMenuHandler = null;
     this.element.remove();
   }
 
   private setBusy(busy: boolean): void {
     this.busy = busy;
     this.playAgainButton.disabled = busy;
+    this.modeSelectButton.disabled = busy;
     this.playAgainButton.setAttribute('aria-busy', String(busy));
+    this.modeSelectButton.setAttribute('aria-busy', String(busy));
   }
 
   private readonly handlePlayAgain = (): void => {
@@ -114,6 +139,24 @@ export class VictoryScreen {
       await this.playAgainHandler?.();
     } catch (error: unknown) {
       console.error('Unable to start another run.', error);
+      this.setBusy(false);
+    }
+  }
+
+  private readonly handleReturnToMenu = (): void => {
+    if (this.busy || this.returnToMenuHandler === null) {
+      return;
+    }
+
+    this.setBusy(true);
+    void this.runReturnToMenuHandler();
+  };
+
+  private async runReturnToMenuHandler(): Promise<void> {
+    try {
+      await this.returnToMenuHandler?.();
+    } catch (error: unknown) {
+      console.error('Unable to return to mode selection.', error);
       this.setBusy(false);
     }
   }

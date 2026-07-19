@@ -6,13 +6,13 @@
 
 ## État
 
-- [ ] Gate E validée par le propriétaire du projet.
-- [x] Validation automatique terminée ; parcours manuel demandé.
+- [x] Gate E validée par le propriétaire du projet.
+- [x] Validation automatique terminée.
 - [ ] Gate E refusée.
 
-La chambre, la salle de bain et le premier couloir sont construits dans leur
-ordre réel. Le troisième passage termine provisoirement la partie sur l’écran de
-victoire tant que le bureau n’est pas encore raccordé.
+La chambre, la salle de bain et le premier couloir ont été validés dans leur
+ordre réel. Au moment de la Gate, le troisième passage terminait provisoirement
+la partie ; le bureau est maintenant raccordé à cette sortie.
 
 ## Préchargement validé automatiquement
 
@@ -53,9 +53,8 @@ Pendant les deux transitions, vérifier également :
 - ambiance audio relancée une seule fois ;
 - panneau debug `H` associé uniquement à la salle active.
 
-## Décision attendue
+## Décision
 
-Si ces contrôles passent, cocher `Gate E validée` puis commencer le bureau, salle
-4 du parcours. Les packs locaux KayKit et Quaternius contiennent déjà l’essentiel
-du mobilier nécessaire ; Poly Pizza ne devra servir qu’à compléter un objet
-signature réellement manquant.
+La production du bureau, salle 4 du parcours, est autorisée. Les packs locaux
+KayKit et Quaternius contiennent déjà l’essentiel du mobilier nécessaire ; Poly
+Pizza ne devra servir qu’à compléter un objet signature réellement manquant.

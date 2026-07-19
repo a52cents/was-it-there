@@ -9,6 +9,7 @@ export interface ReportHudView {
   readonly state: GameState;
   readonly remainingCount: number;
   readonly aimedAtTarget: boolean;
+  readonly storyInteractionLabel: string | null;
   readonly errorCount: number;
   readonly maximumErrors: number;
 }
@@ -20,6 +21,7 @@ export class ReportHud {
   private readonly errorsValue: HTMLOutputElement;
   private readonly reticle: HTMLElement;
   private readonly reticleSymbol: HTMLSpanElement;
+  private readonly interactionLabel: HTMLElement;
   private readonly feedbackLabel: HTMLElement;
   private feedbackOutcome: ReportFeedback | null = null;
   private feedbackEndsAt = 0;
@@ -54,7 +56,10 @@ export class ReportHud {
 
     this.reticleSymbol = document.createElement('span');
     this.reticleSymbol.className = 'target-reticle-symbol';
-    this.reticle.append(this.reticleSymbol);
+    this.interactionLabel = document.createElement('span');
+    this.interactionLabel.className = 'target-reticle-label';
+    this.interactionLabel.hidden = true;
+    this.reticle.append(this.reticleSymbol, this.interactionLabel);
 
     this.feedbackLabel = document.createElement('div');
     this.feedbackLabel.className = 'report-feedback-label';
@@ -84,6 +89,8 @@ export class ReportHud {
       view.state === 'room-complete' && feedbackActive;
     const feedbackVisible =
       feedbackActive && (searchActive || showCompletionFeedback);
+    const storyInteractionActive =
+      view.storyInteractionLabel !== null && !feedbackActive;
 
     this.counter.hidden = !searchActive && !showCompletionFeedback;
     this.counterValue.value = String(view.remainingCount);
@@ -91,11 +98,14 @@ export class ReportHud {
     this.errorsValue.value = `${view.errorCount} / ${view.maximumErrors}`;
     this.errors.classList.toggle('has-errors', view.errorCount > 0);
 
-    this.reticle.hidden = !searchActive && !showCompletionFeedback;
+    this.reticle.hidden =
+      !searchActive && !showCompletionFeedback && !storyInteractionActive;
     this.reticle.classList.toggle(
       'is-targeted',
-      searchActive && view.aimedAtTarget && !feedbackActive,
+      (searchActive && view.aimedAtTarget && !feedbackActive) ||
+        storyInteractionActive,
     );
+    this.reticle.classList.toggle('is-story', storyInteractionActive);
     this.reticle.classList.toggle(
       'is-correct',
       this.feedbackOutcome === 'correct',
@@ -112,6 +122,14 @@ export class ReportHud {
             this.feedbackOutcome === 'timeout'
           ? '×'
           : '';
+
+    const interactionCopy = storyInteractionActive
+      ? view.storyInteractionLabel
+      : searchActive && view.aimedAtTarget && !feedbackActive
+        ? 'REPORT'
+        : null;
+    this.interactionLabel.hidden = interactionCopy === null;
+    this.interactionLabel.textContent = interactionCopy;
 
     this.feedbackLabel.hidden = !feedbackVisible;
     this.feedbackLabel.classList.toggle(
@@ -139,6 +157,7 @@ export class ReportHud {
     this.counter.hidden = true;
     this.errors.hidden = true;
     this.reticle.hidden = true;
+    this.interactionLabel.hidden = true;
     this.feedbackLabel.hidden = true;
   }
 

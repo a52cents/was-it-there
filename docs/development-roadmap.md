@@ -1164,14 +1164,13 @@ synchronisées avec leurs anomalies. Le catalogue vide du Level Builder est
 runtime.
 
 Pour compenser la surface plus grande sans retirer la hausse de difficulté, le
-joueur dispose de 20 secondes d’observation et 45 secondes de recherche. Chaque
+joueur dispose de 15 secondes d’observation et 45 secondes de recherche. Chaque
 passage contient exactement deux anomalies parmi les 16 cibles.
 
 Les validations automatiques couvrent le shell en L, le spawn, les lumières,
 les seize chargements GLB, l’unicité des cibles, la génération déterministe, les
 dépendances console/téléphone et petite table/enceinte, ainsi que la libération
-des assets. La Gate E reste en attente de la validation visuelle et jouable des
-trois transitions consécutives par le propriétaire du projet.
+des assets. La Gate E a ensuite été validée par le propriétaire du projet.
 
 ### Couleurs variables dans l’état initial — 18 juillet 2026
 
@@ -1204,8 +1203,37 @@ bain ; la salle de bain précharge le premier couloir. Aucun asset supplémentai
 n’est nécessaire pour cette fondation.
 
 Les contrôles automatiques de transfert, concurrence, annulation, repli et
-libération mémoire sont terminés. La Gate E attend seulement le parcours manuel
-des trois salles consécutives décrit dans `docs/GATE_E_REPORT.md`.
+libération mémoire sont terminés. La Gate E et le parcours manuel des trois
+salles consécutives sont validés dans `docs/GATE_E_REPORT.md`.
+
+### Grand bureau polygonal jouable — 19 juillet 2026
+
+La quatrième salle est raccordée à la sortie du premier couloir et devient la
+première pièce du Groupe 2. Sa surface utile atteint environ `8,4 × 8,4 m`, bien
+au-delà des pièces précédentes. Le plan comporte huit pans : une grande zone
+principale débouche sur une baie de lecture trapézoïdale avancée, bordée de trois
+fenêtres. Le bureau ne ressemble donc ni à un rectangle ni au couloir en L.
+
+La composition impose un vrai déplacement de mémorisation entre trois zones :
+l’îlot de travail central, les archives latérales et le coin lecture dans la
+baie. Dix-huit cibles sont réparties dans ces zones : bureau, chaise, lampe,
+téléphone, livres et photo ; deux rangements, bibliothèque, radio et enceinte ;
+fauteuil, tapis et plante de baie ; deux cadres, horloge et carton d’archives.
+
+Tous les modèles sont réutilisés depuis les catalogues GLB déjà intégrés de la
+chambre et du couloir. Aucun nouveau fichier, téléchargement ni coût de build
+n’est ajouté. Le bureau emporte ses quatre accessoires lorsqu’il disparaît et
+la bibliothèque emporte la radio et l’enceinte. Cinq meubles possèdent des
+collisions synchronisées avec les anomalies. Chaque cible offre apparition,
+disparition et deux couleurs ; seules les silhouettes cohérentes tournent à 30°,
+et les deux cadres muraux à 15°.
+
+La salle utilise la difficulté modérée prévue par la route : 15 secondes
+d’observation, 30 secondes de recherche et une à deux anomalies déterministes.
+Le premier couloir la précharge désormais hors scène. La sortie du bureau mène
+provisoirement à la victoire tant que la cuisine n’est pas construite. Son
+catalogue Level Builder vide est enregistré pour les futures variantes
+manuelles.
 
 ------------------------------------------------------------------------
 

@@ -15,4 +15,5 @@ export const ENGLISH_COPY = {
   penalties: 'PENALTIES',
   perfectRun: 'PERFECT RUN',
   playAgain: 'PLAY AGAIN',
+  modeSelect: 'MODE SELECT',
 } as const;

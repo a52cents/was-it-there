@@ -1,16 +1,13 @@
 # Was It There?
 
 **Was It There?** is a browser-based 3D observation game built with Vite,
-strict TypeScript, and Three.js. The current codebase contains only the clean
-technical foundation for the game plus its desktop input, cinematic FPS
-controller, capsule/Octree collisions, and primitive greybox bedroom: a start
-screen, a responsive renderer, a single fixed-step loop, centralized keyboard
-and mouse actions, pointer-lock handling, an explicit game state machine,
-monotonic run/phase timing, fourteen typed anomaly targets, center-screen selection,
-deterministic prepared anomaly variants, a blackout transition, and the
-standalone platform adapter.
+strict TypeScript, and Three.js. The current playable route contains four
+connected rooms, FPS controls, capsule/Octree collisions, deterministic anomaly
+baselines, off-scene room preloading, center-screen reporting, blackout
+transitions, procedural audio, a development Level Builder, and the standalone
+platform adapter.
 
-Current milestone: Phase 5.4 — complete bedroom anomaly catalog
+Current milestone: Phase 6 — fourth playable room (large office)
 
 ## Prerequisites
 
@@ -120,7 +117,15 @@ plus ±10° rotations where spatially credible. The final room exposes 100
 prepared variants, with synchronized collision updates for the bed, wardrobe,
 and TV cabinet.
 
+The multi-room route now includes the bedroom, bathroom, L-shaped corridor, and
+a substantially larger polygonal office with a projecting glazed reading bay.
+Rooms preload off-scene and transfer into gameplay without recreating their GLB
+instances. The office contains 18 anomaly targets split between a central work
+island, archive walls, and the reading bay, while reusing existing licensed
+assets without increasing the model catalog.
+
 The audit decisions and validation evidence are recorded in
 [`docs/GATE_B_REPORT.md`](./docs/GATE_B_REPORT.md) and
-[`docs/GATE_C_REPORT.md`](./docs/GATE_C_REPORT.md). External asset provenance is
+[`docs/GATE_C_REPORT.md`](./docs/GATE_C_REPORT.md), with the three-room route
+validation in [`docs/GATE_E_REPORT.md`](./docs/GATE_E_REPORT.md). External asset provenance is
 tracked in [`docs/ASSET_LICENSES.md`](./docs/ASSET_LICENSES.md).

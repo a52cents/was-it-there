@@ -15,10 +15,12 @@ import {
   restoreAnomalyCollisionObjectState,
   restoreAnomalyTargetInitialState,
   RESTORE_CANONICAL_COLORS_VARIANT_ID,
+  RESTORE_CANONICAL_ROTATION_VARIANT_ID,
   type AnomalyTarget,
   type AnomalyNodePathSegment,
   type ColorAnomalyVariant,
   type PreparedAnomalyVariant,
+  type RotationAnomalyVariant,
 } from './AnomalyTarget';
 import {
   prepareLevelBuilderCatalog,
@@ -32,6 +34,7 @@ export interface PrepareRunBaselineOptions {
   readonly runSeed: number;
   readonly roomIndex: number;
   readonly roomId: string;
+  readonly requiredVisibleTargetIds?: readonly string[];
 }
 
 export interface RoomBaselineSnapshot {
@@ -39,9 +42,15 @@ export interface RoomBaselineSnapshot {
   readonly baselineSeed: number;
   readonly hiddenTargetIds: readonly string[];
   readonly colorChanges: readonly RoomBaselineColorChange[];
+  readonly rotationChanges: readonly RoomBaselineRotationChange[];
 }
 
 export interface RoomBaselineColorChange {
+  readonly targetId: string;
+  readonly variantId: string;
+}
+
+export interface RoomBaselineRotationChange {
   readonly targetId: string;
   readonly variantId: string;
 }
@@ -60,6 +69,9 @@ const INITIAL_ABSENCE_WEIGHT_MULTIPLIER = 4;
 const INITIAL_COLOR_CHANCE_PER_TARGET = 0.15;
 const MAX_INITIAL_COLOR_CHANGES = 2;
 const INITIAL_COLOR_WEIGHT_MULTIPLIER = 3;
+const INITIAL_ROTATION_CHANCE_PER_TARGET = 0.3;
+const MAX_INITIAL_ROTATION_CHANGES = 2;
+const INITIAL_ROTATION_WEIGHT_MULTIPLIER = 3;
 const BASELINE_SEED_DOMAIN = 'initial-layout';
 
 export class RoomAnomalySystem {
@@ -70,6 +82,11 @@ export class RoomAnomalySystem {
     string,
     string
   >();
+  private readonly baselineRotationVariantIdsByTargetId = new Map<
+    string,
+    string
+  >();
+  private readonly requiredVisibleTargetIds = new Set<string>();
   private preparedBuilderCatalog: PreparedLevelBuilderCatalog | null = null;
   private collisionStateDirty = false;
   private readonly builderVariantsByTargetId = new Map<
@@ -138,6 +155,18 @@ export class RoomAnomalySystem {
     this.restoreCanonicalState();
     this.baselineHiddenTargetIds.clear();
     this.baselineColorVariantIdsByTargetId.clear();
+    this.baselineRotationVariantIdsByTargetId.clear();
+    this.requiredVisibleTargetIds.clear();
+
+    for (const targetId of options.requiredVisibleTargetIds ?? []) {
+      if (this.registry.getById(targetId) === null) {
+        throw new Error(
+          `Protected Story target "${targetId}" is not registered in room "${options.roomId}".`,
+        );
+      }
+
+      this.requiredVisibleTargetIds.add(targetId);
+    }
 
     const runSeed = normalizeSeed(options.runSeed);
     const baselineSeed = deriveRoomSeed(
@@ -148,10 +177,12 @@ export class RoomAnomalySystem {
     const random = new SeededRandom(baselineSeed);
     const candidates = this.registry
       .getAll()
-      .filter((target) =>
-        this.getPreparedVariants(target).some(
-          (variant) => variant.kind === 'show',
-        ),
+      .filter(
+        (target) =>
+          this.canBeAbsentInBaseline(target) &&
+          this.getPreparedVariants(target).some(
+            (variant) => variant.kind === 'show',
+          ),
       );
 
     if (
@@ -202,6 +233,41 @@ export class RoomAnomalySystem {
       }
     }
 
+    const rotationCandidates = this.registry
+      .getAll()
+      .filter(
+        (target) =>
+          !this.baselineHiddenTargetIds.has(target.id) &&
+          !suppressedTargetIds.has(target.id),
+      )
+      .map((target) => ({
+        target,
+        rotationVariants: this.getPreparedVariants(target).filter(
+          (variant): variant is RotationAnomalyVariant =>
+            variant.kind === 'rotate',
+        ),
+        roll: random.nextFloat(),
+      }))
+      .filter(
+        ({ rotationVariants, roll }) =>
+          rotationVariants.length > 0 &&
+          roll < INITIAL_ROTATION_CHANCE_PER_TARGET,
+      )
+      .sort((first, second) => first.roll - second.roll)
+      .slice(0, MAX_INITIAL_ROTATION_CHANGES);
+
+    for (const { target, rotationVariants } of rotationCandidates) {
+      const variant =
+        rotationVariants[random.nextInteger(rotationVariants.length)];
+
+      if (variant !== undefined) {
+        this.baselineRotationVariantIdsByTargetId.set(
+          target.id,
+          variant.id,
+        );
+      }
+    }
+
     this.restoreCurrentBaseline();
     this.baselineSnapshot = {
       runSeed,
@@ -209,6 +275,9 @@ export class RoomAnomalySystem {
       hiddenTargetIds: [...this.baselineHiddenTargetIds],
       colorChanges: [
         ...this.baselineColorVariantIdsByTargetId,
+      ].map(([targetId, variantId]) => ({ targetId, variantId })),
+      rotationChanges: [
+        ...this.baselineRotationVariantIdsByTargetId,
       ].map(([targetId, variantId]) => ({ targetId, variantId })),
     };
     this.flushCollisionStateChanges();
@@ -243,6 +312,8 @@ export class RoomAnomalySystem {
   public restore(): void {
     this.baselineHiddenTargetIds.clear();
     this.baselineColorVariantIdsByTargetId.clear();
+    this.baselineRotationVariantIdsByTargetId.clear();
+    this.requiredVisibleTargetIds.clear();
     this.baselineSnapshot = null;
     this.restoreCanonicalState();
     this.flushCollisionStateChanges();
@@ -284,6 +355,24 @@ export class RoomAnomalySystem {
             );
 
       if (target === null || variant?.kind !== 'color') {
+        continue;
+      }
+
+      this.applyVariant(target, variant);
+      target.object.updateMatrixWorld(true);
+    }
+
+    for (const [targetId, variantId] of this
+      .baselineRotationVariantIdsByTargetId) {
+      const target = this.registry.getById(targetId);
+      const variant =
+        target === null
+          ? undefined
+          : this.getPreparedVariants(target).find(
+              (candidate) => candidate.id === variantId,
+            );
+
+      if (target === null || variant?.kind !== 'rotate') {
         continue;
       }
 
@@ -462,18 +551,29 @@ export class RoomAnomalySystem {
         const startsHidden = this.baselineHiddenTargetIds.has(target.id);
         const baselineColorVariantId =
           this.baselineColorVariantIdsByTargetId.get(target.id);
+        const baselineRotationVariantId =
+          this.baselineRotationVariantIdsByTargetId.get(target.id);
         const variants = this.getPreparedVariants(target).filter(
           (variant) =>
             variant.id !== baselineColorVariantId &&
+            variant.id !== baselineRotationVariantId &&
+            (baselineRotationVariantId === undefined ||
+              variant.kind !== 'rotate' ||
+              variant.id === RESTORE_CANONICAL_ROTATION_VARIANT_ID) &&
             (startsHidden
               ? variant.kind === 'show'
               : variant.kind !== 'show'),
         );
         const weightMultiplier = startsHidden
           ? INITIAL_ABSENCE_WEIGHT_MULTIPLIER
-          : baselineColorVariantId === undefined
-            ? 1
-            : INITIAL_COLOR_WEIGHT_MULTIPLIER;
+          : Math.max(
+              baselineColorVariantId === undefined
+                ? 1
+                : INITIAL_COLOR_WEIGHT_MULTIPLIER,
+              baselineRotationVariantId === undefined
+                ? 1
+                : INITIAL_ROTATION_WEIGHT_MULTIPLIER,
+            );
 
         return {
           ...target,
@@ -489,16 +589,45 @@ export class RoomAnomalySystem {
   private getPreparedVariants(
     target: AnomalyTarget,
   ): readonly PreparedAnomalyVariant[] {
-    const variants: readonly PreparedAnomalyVariant[] = [
+    const variants: PreparedAnomalyVariant[] = [
       ...target.variants,
       ...(this.builderVariantsByTargetId.get(target.id) ?? []),
     ];
 
-    if (!this.baselineColorVariantIdsByTargetId.has(target.id)) {
-      return variants;
+    if (this.baselineColorVariantIdsByTargetId.has(target.id)) {
+      variants.push(createRestoreCanonicalColorsVariant(target));
     }
 
-    return [...variants, createRestoreCanonicalColorsVariant(target)];
+    const baselineRotationVariantId =
+      this.baselineRotationVariantIdsByTargetId.get(target.id);
+
+    if (baselineRotationVariantId !== undefined) {
+      const baselineVariant = variants.find(
+        (variant): variant is RotationAnomalyVariant =>
+          variant.id === baselineRotationVariantId &&
+          variant.kind === 'rotate',
+      );
+
+      if (baselineVariant === undefined) {
+        throw new Error(
+          `Anomaly target "${target.id}" is missing baseline rotation variant "${baselineRotationVariantId}".`,
+        );
+      }
+
+      variants.push(createRestoreCanonicalRotationVariant(baselineVariant));
+    }
+
+    return variants;
+  }
+
+  private canBeAbsentInBaseline(target: AnomalyTarget): boolean {
+    if (this.requiredVisibleTargetIds.has(target.id)) {
+      return false;
+    }
+
+    return this.getDependentTargets(target).every(
+      (dependent) => !this.requiredVisibleTargetIds.has(dependent.id),
+    );
   }
 
   private getSuppressedTargetIds(): ReadonlySet<string> {
@@ -791,5 +920,27 @@ function createRestoreCanonicalColorsVariant(
     nodeNames: [],
     color: `#${new THREE.Color().fromArray(firstColor).getHexString()}`,
     restoresCanonicalColors: true,
+  };
+}
+
+function createRestoreCanonicalRotationVariant(
+  baselineVariant: RotationAnomalyVariant,
+): RotationAnomalyVariant {
+  const inverseOffset = new THREE.Quaternion()
+    .setFromEuler(new THREE.Euler(...baselineVariant.rotationOffsetRadians))
+    .invert();
+  const inverseEuler = new THREE.Euler().setFromQuaternion(
+    inverseOffset,
+    'XYZ',
+  );
+
+  return {
+    id: RESTORE_CANONICAL_ROTATION_VARIANT_ID,
+    kind: 'rotate',
+    rotationOffsetRadians: [
+      inverseEuler.x,
+      inverseEuler.y,
+      inverseEuler.z,
+    ],
   };
 }

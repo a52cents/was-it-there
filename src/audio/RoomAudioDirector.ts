@@ -18,6 +18,7 @@ export class RoomAudioDirector {
 
   public startRoom(): void {
     this.roomActive = true;
+    this.audio.play('game-soundtrack');
     this.audio.play('room-ambience');
   }
 
@@ -48,6 +49,7 @@ export class RoomAudioDirector {
 
   public reset(): void {
     this.finishRoom();
+    this.audio.stop('game-soundtrack');
     this.lightsReturnPlayed = false;
 
     for (const cue of TRANSIENT_ROOM_CUES) {
@@ -57,6 +59,7 @@ export class RoomAudioDirector {
 
   public resume(): void {
     if (this.roomActive) {
+      this.audio.play('game-soundtrack');
       this.audio.play('room-ambience');
     }
   }

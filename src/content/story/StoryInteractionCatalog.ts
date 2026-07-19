@@ -1,0 +1,142 @@
+import type { StoryInteractionDefinition } from '../../gameplay/story/StoryInteraction';
+
+export const BEDROOM_FAMILY_PHOTO_OBJECT_ID = 'bedroom-family-photo';
+export const BEDROOM_STORY_OBJECT_IDS = {
+  photo: BEDROOM_FAMILY_PHOTO_OBJECT_ID,
+  radio: 'bedroom-radio',
+  television: 'bedroom-television',
+  wardrobe: 'bedroom-wardrobe',
+  bed: 'bedroom-bed',
+  books: 'bedroom-books',
+  picture: 'bedroom-wall-picture',
+  plant: 'bedroom-plant',
+} as const;
+export const BATHROOM_STORY_OBJECT_IDS = {
+  mirror: 'bathroom-mirror',
+  bathtub: 'bathroom-bathtub',
+  vanity: 'bathroom-vanity',
+  toothbrushes: 'bathroom-toothbrushes',
+  duck: 'bathroom-rubber-duck',
+  candle: 'bathroom-candle',
+  towels: 'bathroom-towels',
+} as const;
+export const CORRIDOR_PHONE_OBJECT_ID = 'corridor-phone';
+
+export const STORY_INTERACTION_CATALOG = [
+  {
+    id: BEDROOM_FAMILY_PHOTO_OBJECT_ID,
+    roomId: 'greybox-bedroom',
+    targetId: 'photo-frame',
+    actionLabel: 'EXAMINE',
+    phases: ['observation', 'room-complete'],
+    requiredEventIdBeforeExit: 'bedroom-empty-place',
+    exitInstruction: 'EXAMINE THE ROOM',
+  },
+  {
+    id: BEDROOM_STORY_OBJECT_IDS.radio,
+    roomId: 'greybox-bedroom',
+    targetId: 'radio',
+    actionLabel: 'EXAMINE',
+    phases: ['observation', 'room-complete'],
+  },
+  {
+    id: BEDROOM_STORY_OBJECT_IDS.television,
+    roomId: 'greybox-bedroom',
+    targetId: 'television',
+    actionLabel: 'EXAMINE',
+    phases: ['observation', 'room-complete'],
+  },
+  {
+    id: BEDROOM_STORY_OBJECT_IDS.wardrobe,
+    roomId: 'greybox-bedroom',
+    targetId: 'wardrobe',
+    actionLabel: 'EXAMINE',
+    phases: ['observation', 'room-complete'],
+  },
+  {
+    id: BEDROOM_STORY_OBJECT_IDS.bed,
+    roomId: 'greybox-bedroom',
+    targetId: 'bed',
+    actionLabel: 'EXAMINE',
+    phases: ['observation', 'room-complete'],
+  },
+  {
+    id: BEDROOM_STORY_OBJECT_IDS.books,
+    roomId: 'greybox-bedroom',
+    targetId: 'books',
+    actionLabel: 'EXAMINE',
+    phases: ['observation', 'room-complete'],
+  },
+  {
+    id: BEDROOM_STORY_OBJECT_IDS.picture,
+    roomId: 'greybox-bedroom',
+    targetId: 'picture',
+    actionLabel: 'EXAMINE',
+    phases: ['observation', 'room-complete'],
+  },
+  {
+    id: BEDROOM_STORY_OBJECT_IDS.plant,
+    roomId: 'greybox-bedroom',
+    targetId: 'plant',
+    actionLabel: 'EXAMINE',
+    phases: ['observation', 'room-complete'],
+  },
+  {
+    id: BATHROOM_STORY_OBJECT_IDS.mirror,
+    roomId: 'bathroom',
+    targetId: 'mirror',
+    actionLabel: 'EXAMINE',
+    phases: ['observation', 'room-complete'],
+    requiredEventIdBeforeExit: 'bathroom-mirror-inspection',
+    exitInstruction: 'EXAMINE THE ROOM',
+  },
+  {
+    id: BATHROOM_STORY_OBJECT_IDS.bathtub,
+    roomId: 'bathroom',
+    targetId: 'bathtub',
+    actionLabel: 'EXAMINE',
+    phases: ['observation', 'room-complete'],
+  },
+  {
+    id: BATHROOM_STORY_OBJECT_IDS.vanity,
+    roomId: 'bathroom',
+    targetId: 'vanity',
+    actionLabel: 'EXAMINE',
+    phases: ['observation', 'room-complete'],
+  },
+  {
+    id: BATHROOM_STORY_OBJECT_IDS.toothbrushes,
+    roomId: 'bathroom',
+    targetId: 'toothbrush-cup',
+    actionLabel: 'EXAMINE',
+    phases: ['observation', 'room-complete'],
+  },
+  {
+    id: BATHROOM_STORY_OBJECT_IDS.duck,
+    roomId: 'bathroom',
+    targetId: 'rubber-duck',
+    actionLabel: 'EXAMINE',
+    phases: ['observation', 'room-complete'],
+  },
+  {
+    id: BATHROOM_STORY_OBJECT_IDS.candle,
+    roomId: 'bathroom',
+    targetId: 'candle',
+    actionLabel: 'EXAMINE',
+    phases: ['observation', 'room-complete'],
+  },
+  {
+    id: BATHROOM_STORY_OBJECT_IDS.towels,
+    roomId: 'bathroom',
+    targetId: 'towels-stacked',
+    actionLabel: 'EXAMINE',
+    phases: ['observation', 'room-complete'],
+  },
+  {
+    id: CORRIDOR_PHONE_OBJECT_ID,
+    roomId: 'first-corridor',
+    targetId: 'phone',
+    actionLabel: 'ANSWER',
+    phases: ['observation'],
+  },
+] as const satisfies readonly StoryInteractionDefinition[];

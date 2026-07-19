@@ -164,3 +164,11 @@ La source et sa licence CC0 sont archivées dans
 [`docs/licenses/quaternius-ultimate-house-interior-pack.txt`](./licenses/quaternius-ultimate-house-interior-pack.txt).
 Tiny Treats a été retenu pour cette salle afin de garder une direction visuelle
 unique et d’éviter un second pipeline FBX.
+
+## Réutilisation — bureau
+
+Le bureau n’ajoute aucun fichier 3D au build. Ses dix-huit instances réutilisent
+les GLB déjà référencés de la chambre et du premier couloir : mobilier Kenney,
+cadres et accessoires KayKit, ainsi que le téléphone et l’horloge Poly Pizza
+déjà attribués ci-dessus. Les identifiants d’assets restent identiques afin que
+le cache partage les sources pendant le préchargement du bureau.

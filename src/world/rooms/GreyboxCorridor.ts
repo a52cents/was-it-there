@@ -383,7 +383,7 @@ export class GreyboxCorridor extends RoomRuntime implements PlayableRoom {
   public readonly definition: RoomDefinition = {
     id: 'first-corridor',
     displayName: 'Corridor',
-    observationDurationMs: 20_000,
+    observationDurationMs: 15_000,
     searchDurationMs: 45_000,
     anomalyCount: { min: 2, max: 2 },
     playerSpawn: {
@@ -700,6 +700,10 @@ export class GreyboxCorridor extends RoomRuntime implements PlayableRoom {
       object.add(glow);
     }
 
+    if (placement.targetId === 'wall-clock') {
+      this.addStoryClockDisplay(object);
+    }
+
     const surfaceNames: string[] = [];
     object.traverse((candidate) => {
       const mesh = candidate as THREE.Mesh;
@@ -787,6 +791,82 @@ export class GreyboxCorridor extends RoomRuntime implements PlayableRoom {
         color,
       })),
     ];
+  }
+
+  private addStoryClockDisplay(clock: THREE.Group): void {
+    const display = new THREE.Group();
+    display.name = 'STORY_CorridorClock_0317';
+    display.position.set(0.022, 0, 0);
+    display.rotation.y = Math.PI / 2;
+    display.scale.set(
+      1 / clock.scale.x,
+      1 / clock.scale.y,
+      1 / clock.scale.z,
+    );
+    const material = this.ownMaterial(
+      new THREE.MeshBasicMaterial({
+        color: '#7f2524',
+        transparent: true,
+        opacity: 0.82,
+        depthWrite: false,
+      }),
+    );
+    material.name = 'STORY_CorridorClock_Digits';
+    const horizontal = this.ownGeometry(
+      new THREE.PlaneGeometry(0.042, 0.007),
+    );
+    const vertical = this.ownGeometry(
+      new THREE.PlaneGeometry(0.007, 0.038),
+    );
+    const segmentOffsets = {
+      a: [0, 0.043],
+      b: [0.022, 0.022],
+      c: [0.022, -0.022],
+      d: [0, -0.043],
+      e: [-0.022, -0.022],
+      f: [-0.022, 0.022],
+      g: [0, 0],
+    } as const;
+    const digitSegments = {
+      '0': ['a', 'b', 'c', 'd', 'e', 'f'],
+      '1': ['b', 'c'],
+      '3': ['a', 'b', 'c', 'd', 'g'],
+      '7': ['a', 'b', 'c'],
+    } as const;
+    const digitXs = [-0.12, -0.055, 0.055, 0.12] as const;
+
+    for (const [digitIndex, digit] of ['0', '3', '1', '7'].entries()) {
+      for (const segmentId of digitSegments[digit as keyof typeof digitSegments]) {
+        const [x, y] = segmentOffsets[segmentId];
+        const segment = new THREE.Mesh(
+          segmentId === 'b' ||
+          segmentId === 'c' ||
+          segmentId === 'e' ||
+          segmentId === 'f'
+            ? vertical
+            : horizontal,
+          material,
+        );
+        segment.name = `STORY_CorridorClock_Digit${digitIndex}_${segmentId}`;
+        segment.position.set((digitXs[digitIndex] ?? 0) + x, y, 0);
+        segment.layers.set(RENDER_LAYERS.scene);
+        display.add(segment);
+      }
+    }
+
+    const colonGeometry = this.ownGeometry(
+      new THREE.CircleGeometry(0.005, 8),
+    );
+
+    for (const y of [-0.018, 0.018]) {
+      const dot = new THREE.Mesh(colonGeometry, material);
+      dot.name = `STORY_CorridorClock_Colon_${String(y)}`;
+      dot.position.set(0, y, 0);
+      dot.layers.set(RENDER_LAYERS.scene);
+      display.add(dot);
+    }
+
+    clock.add(display);
   }
 
   private getCollisionObjects(

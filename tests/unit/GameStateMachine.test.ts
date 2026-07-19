@@ -37,6 +37,7 @@ describe('GameStateMachine', () => {
   it('supports the game-over and victory branches', () => {
     const failedRun = new GameStateMachine();
     reachSearch(failedRun);
+    failedRun.transitionTo('failure-sequence');
     failedRun.transitionTo('game-over');
     failedRun.transitionTo('main-menu');
 
@@ -53,6 +54,7 @@ describe('GameStateMachine', () => {
   it('can restart directly from Game Over into a fresh room intro', () => {
     const machine = new GameStateMachine();
     reachSearch(machine);
+    machine.transitionTo('failure-sequence');
     machine.transitionTo('game-over');
 
     machine.transitionTo('room-intro');
@@ -90,6 +92,26 @@ describe('GameStateMachine', () => {
     expect(machine.resume()).toBe(true);
     expect(machine.currentState).toBe('search');
     expect(machine.stateBeforePause).toBeNull();
+  });
+
+  it('pauses and restores the house takeover sequence', () => {
+    const machine = new GameStateMachine();
+    reachSearch(machine);
+    machine.transitionTo('failure-sequence');
+
+    expect(machine.pause()).toBe(true);
+    expect(machine.stateBeforePause).toBe('failure-sequence');
+    expect(machine.resume()).toBe(true);
+    expect(machine.currentState).toBe('failure-sequence');
+  });
+
+  it('requires the failure sequence before Game Over', () => {
+    const machine = new GameStateMachine();
+    reachSearch(machine);
+
+    expect(() => machine.transitionTo('game-over')).toThrow(
+      InvalidGameStateTransitionError,
+    );
   });
 
   it('does not pause non-gameplay states or resume when not paused', () => {

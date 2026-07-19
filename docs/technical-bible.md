@@ -582,10 +582,12 @@ Aucune anomalie ne doit laisser une mutation permanente non suivie.
 
 Chaque partie possède une seed numérique.
 
+    type GameMode = 'story' | 'escape';
+
     interface RunIdentity {
       seed: number;
       startedAt: number;
-      mode: 'escape';
+      mode: GameMode;
     }
 
 Chaque salle dérive sa propre seed :

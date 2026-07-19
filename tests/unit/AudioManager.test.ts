@@ -69,17 +69,26 @@ class FakeBiquadFilterNode extends FakeAudioNode {
 }
 
 class FakeAudioBuffer {
-  private readonly samples: Float32Array;
+  private readonly channels: readonly Float32Array[];
 
   public readonly frameCount: number;
 
-  public constructor(frameCount: number) {
+  public constructor(numberOfChannels: number, frameCount: number) {
     this.frameCount = frameCount;
-    this.samples = new Float32Array(frameCount);
+    this.channels = Array.from(
+      { length: numberOfChannels },
+      () => new Float32Array(frameCount),
+    );
   }
 
-  public getChannelData(_channel: number): Float32Array {
-    return this.samples;
+  public getChannelData(channel: number): Float32Array {
+    const samples = this.channels[channel];
+
+    if (samples === undefined) {
+      throw new RangeError(`Audio channel ${channel} is unavailable.`);
+    }
+
+    return samples;
   }
 }
 
@@ -127,11 +136,11 @@ class FakeAudioContext {
   }
 
   public createBuffer(
-    _channels: number,
+    channels: number,
     frameCount: number,
     _sampleRate: number,
   ): FakeAudioBuffer {
-    return new FakeAudioBuffer(frameCount);
+    return new FakeAudioBuffer(channels, frameCount);
   }
 }
 
@@ -160,7 +169,7 @@ describe('AudioManager', () => {
     expect(manager.getSnapshot().contextState).toBe('running');
   });
 
-  it('keeps one deterministic ambience loop and stops all of its sources', async () => {
+  it('keeps one deterministic room tone and stops all of its sources', async () => {
     const context = new FakeAudioContext();
     const manager = new AudioManager(
       () => context as unknown as AudioContext,
@@ -170,11 +179,11 @@ describe('AudioManager', () => {
     manager.play('room-ambience');
     manager.play('room-ambience');
 
-    expect(context.bufferSources).toHaveLength(2);
+    expect(context.bufferSources).toHaveLength(1);
     expect(context.bufferSources.every((source) => source.loop)).toBe(true);
     expect(
       context.bufferSources.map((source) => source.buffer?.frameCount),
-    ).toEqual([200, 1_800]);
+    ).toEqual([200]);
     expect(context.oscillators).toHaveLength(2);
     expect(manager.getSnapshot().activeCueIds).toEqual(['room-ambience']);
 
@@ -187,6 +196,38 @@ describe('AudioManager', () => {
     expect(manager.getSnapshot().activeCueIds).toEqual([]);
   });
 
+  it('keeps the soundtrack playing continuously while room ambience changes', async () => {
+    const context = new FakeAudioContext();
+    const manager = new AudioManager(
+      () => context as unknown as AudioContext,
+    );
+    await manager.unlock();
+
+    manager.play('game-soundtrack');
+    manager.play('game-soundtrack');
+    const soundtrack = context.bufferSources[0];
+
+    expect(soundtrack?.buffer?.frameCount).toBe(8_400);
+    expect(soundtrack?.loop).toBe(true);
+    expect(context.bufferSources).toHaveLength(1);
+
+    manager.play('room-ambience');
+    manager.stop('room-ambience');
+    manager.play('room-ambience');
+    manager.play('game-soundtrack');
+
+    expect(context.bufferSources).toHaveLength(3);
+    expect(soundtrack?.starts).toHaveLength(1);
+    expect(soundtrack?.stops).toHaveLength(0);
+    expect(manager.getSnapshot().activeCueIds).toEqual([
+      'game-soundtrack',
+      'room-ambience',
+    ]);
+
+    manager.stop('game-soundtrack');
+    expect(soundtrack?.stops).toHaveLength(1);
+  });
+
   it('routes transient cues, preserves ambience while muted, and updates mixer volumes', async () => {
     const context = new FakeAudioContext();
     const manager = new AudioManager(
@@ -194,19 +235,49 @@ describe('AudioManager', () => {
     );
     await manager.unlock();
     manager.play('room-ambience');
+    manager.play('game-soundtrack');
     manager.play('blackout-cue');
     manager.play('lights-return');
     manager.play('report-correct');
     manager.play('report-incorrect');
+    manager.play('house-calm');
+    manager.play('house-pressure-1');
+    manager.play('house-pressure-2');
+    manager.play('house-takeover');
+    manager.play('story-radio-burst');
+    manager.play('story-photo-memory');
+    manager.play('story-radio-message');
+    manager.play('story-radio-search');
+    manager.play('story-bathroom-pipes');
+    manager.play('story-bathroom-warning');
+    manager.play('story-bathroom-failure');
+    manager.play('story-corridor-ring');
+    manager.play('story-corridor-prediction');
+    manager.play('story-corridor-failure');
     manager.play('door-unlock');
     manager.play('door-open');
 
     expect(manager.getSnapshot().activeCueIds).toEqual([
+      'game-soundtrack',
       'room-ambience',
       'blackout-cue',
       'lights-return',
       'report-correct',
       'report-incorrect',
+      'house-calm',
+      'house-pressure-1',
+      'house-pressure-2',
+      'house-takeover',
+      'story-radio-burst',
+      'story-photo-memory',
+      'story-radio-message',
+      'story-radio-search',
+      'story-bathroom-pipes',
+      'story-bathroom-warning',
+      'story-bathroom-failure',
+      'story-corridor-ring',
+      'story-corridor-prediction',
+      'story-corridor-failure',
       'door-unlock',
       'door-open',
     ]);
@@ -216,6 +287,7 @@ describe('AudioManager', () => {
     manager.setMuted(true);
     expect(context.gains[0]?.gain.value).toBe(0);
     expect(manager.getSnapshot().activeCueIds).toContain('room-ambience');
+    expect(manager.getSnapshot().activeCueIds).toContain('game-soundtrack');
     manager.setMuted(false);
     expect(context.gains[0]?.gain.value).toBe(1);
   });

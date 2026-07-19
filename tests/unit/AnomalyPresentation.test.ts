@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { AnomalyPlan } from '../../src/gameplay/anomalies/AnomalyGenerator';
-import { describeFirstAnomaly } from '../../src/gameplay/anomalies/AnomalyPresentation';
+import {
+  describeFirstAnomaly,
+  describeMissedAnomalyForMode,
+} from '../../src/gameplay/anomalies/AnomalyPresentation';
 
 describe('describeFirstAnomaly', () => {
   it.each([
@@ -31,6 +34,38 @@ describe('describeFirstAnomaly', () => {
         createPlan('television', 'color', 'restored-base-color'),
       ),
     ).toMatchObject({ changeLabel: 'ITS ORIGINAL COLOR RETURNED' });
+  });
+
+  it('explains when the anomaly restores the original orientation', () => {
+    expect(
+      describeFirstAnomaly(
+        createPlan(
+          'photo-frame',
+          'rotate',
+          'restored-base-orientation',
+        ),
+      ),
+    ).toMatchObject({
+      changeLabel: 'ITS ORIGINAL ORIENTATION RETURNED',
+    });
+  });
+
+  it('uses the office labels in a missed-anomaly reveal', () => {
+    expect(
+      describeFirstAnomaly(
+        createPlan('filing-cabinet', 'hide', 'hidden'),
+      ),
+    ).toMatchObject({ targetLabel: 'FILING CABINET' });
+  });
+
+  it('hides missed anomalies in Story and reveals them in Escape', () => {
+    const plan = createPlan('mirror', 'rotate', 'tilted-left');
+
+    expect(describeMissedAnomalyForMode('story', plan)).toBeNull();
+    expect(describeMissedAnomalyForMode('escape', plan)).toMatchObject({
+      targetId: 'mirror',
+      changeLabel: 'ITS ORIENTATION CHANGED',
+    });
   });
 });
 

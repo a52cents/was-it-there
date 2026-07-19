@@ -41,7 +41,7 @@ describe('EscapeRoute', () => {
     ).toEqual([
       { observation: 10_000, search: 30_000, anomalies: { min: 1, max: 1 } },
       { observation: 10_000, search: 30_000, anomalies: { min: 1, max: 1 } },
-      { observation: 20_000, search: 45_000, anomalies: { min: 2, max: 2 } },
+      { observation: 15_000, search: 45_000, anomalies: { min: 2, max: 2 } },
       { observation: 15_000, search: 30_000, anomalies: { min: 1, max: 2 } },
       { observation: 13_000, search: 28_000, anomalies: { min: 2, max: 2 } },
       { observation: 13_000, search: 28_000, anomalies: { min: 2, max: 2 } },

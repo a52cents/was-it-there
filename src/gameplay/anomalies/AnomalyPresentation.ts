@@ -2,7 +2,11 @@ import type {
   AnomalyPlan,
   ImplementedAnomalyKind,
 } from './AnomalyGenerator';
-import { RESTORE_CANONICAL_COLORS_VARIANT_ID } from './AnomalyTarget';
+import type { GameMode } from '../run/GameMode';
+import {
+  RESTORE_CANONICAL_COLORS_VARIANT_ID,
+  RESTORE_CANONICAL_ROTATION_VARIANT_ID,
+} from './AnomalyTarget';
 
 export interface AnomalyRevealCopy {
   readonly targetId: string;
@@ -41,6 +45,21 @@ const TARGET_LABELS: Readonly<Record<string, string>> = {
   'towels-stacked': 'STACKED TOWELS',
   vanity: 'VANITY',
   'wall-shelf': 'WALL SHELF',
+  'archive-box': 'ARCHIVE BOX',
+  'bay-armchair': 'READING CHAIR',
+  'bay-plant': 'BAY PLANT',
+  'bay-rug': 'BAY RUG',
+  'desk-lamp': 'DESK LAMP',
+  'desk-photo': 'DESK PHOTO',
+  desk: 'DESK',
+  'drawer-cabinet': 'DRAWER CABINET',
+  'filing-cabinet': 'FILING CABINET',
+  'frame-east': 'EAST PICTURE',
+  'frame-west': 'WEST PICTURE',
+  'office-chair': 'OFFICE CHAIR',
+  'office-phone': 'OFFICE PHONE',
+  speaker: 'SPEAKER',
+  'wall-clock': 'WALL CLOCK',
 };
 
 const CHANGE_LABELS: Readonly<Record<ImplementedAnomalyKind, string>> = {
@@ -69,8 +88,18 @@ export function describeFirstAnomaly(
       anomaly.kind === 'color' &&
       anomaly.variantId === RESTORE_CANONICAL_COLORS_VARIANT_ID
         ? 'ITS ORIGINAL COLOR RETURNED'
+        : anomaly.kind === 'rotate' &&
+            anomaly.variantId === RESTORE_CANONICAL_ROTATION_VARIANT_ID
+          ? 'ITS ORIGINAL ORIENTATION RETURNED'
         : CHANGE_LABELS[anomaly.kind],
   };
+}
+
+export function describeMissedAnomalyForMode(
+  mode: GameMode,
+  plan: AnomalyPlan | null,
+): AnomalyRevealCopy | null {
+  return mode === 'escape' ? describeFirstAnomaly(plan) : null;
 }
 
 function formatTargetId(targetId: string): string {

@@ -22,6 +22,8 @@ export type SnapshotColor = readonly [number, number, number];
 
 export const RESTORE_CANONICAL_COLORS_VARIANT_ID =
   'restored-base-color';
+export const RESTORE_CANONICAL_ROTATION_VARIANT_ID =
+  'restored-base-orientation';
 
 export interface HideAnomalyVariant {
   readonly id: string;

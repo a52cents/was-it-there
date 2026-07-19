@@ -1,15 +1,24 @@
 import { normalizeSeed } from '../../core/random/SeededRandom';
+import type { GameMode } from './GameMode';
 
 export interface RunIdentity {
   readonly seed: number;
   readonly startedAt: number;
-  readonly mode: 'escape';
+  readonly mode: GameMode;
+}
+
+export interface CreateRunIdentityOptions {
+  readonly mode?: GameMode;
+  readonly seed?: number;
+  readonly startedAt?: number;
 }
 
 export function createRunIdentity(
-  seed = createEntropySeed(),
-  startedAt = Date.now(),
+  options: CreateRunIdentityOptions = {},
 ): RunIdentity {
+  const seed = options.seed ?? createEntropySeed();
+  const startedAt = options.startedAt ?? Date.now();
+
   if (!Number.isFinite(startedAt)) {
     throw new Error(`Run start time must be finite; received ${startedAt}.`);
   }
@@ -17,7 +26,7 @@ export function createRunIdentity(
   return {
     seed: normalizeSeed(seed),
     startedAt: Math.trunc(startedAt),
-    mode: 'escape',
+    mode: options.mode ?? 'escape',
   };
 }
 

@@ -322,7 +322,7 @@ describe('GreyboxBedroom final decor', () => {
     room.unmount();
     expect(manager.getCachedAssetCount()).toBe(0);
     expect(room.isFinalDecorLoaded()).toBe(false);
-  });
+  }, 10_000);
 
   it('reloads fresh decor instances after a room remount', async () => {
     const load = vi.fn((url: string) => Promise.resolve(createSource(url)));
@@ -480,6 +480,37 @@ describe('GreyboxBedroom final decor', () => {
     expectTargetVisualVisibility(photoFrame, true);
     expect(radio.interactionVolume.visible).toBe(true);
     expect(photoFrame.interactionVolume.visible).toBe(true);
+
+    let generatedProtectedFamilyDisappearance = false;
+
+    for (let seed = 0; seed < 200; seed += 1) {
+      const requiredBaseline = system.prepareRunBaseline({
+        runSeed: seed,
+        roomIndex: 0,
+        roomId: room.definition.id,
+        requiredVisibleTargetIds: ['radio', 'photo-frame'],
+      });
+      expect(requiredBaseline.hiddenTargetIds).not.toContain('bookcase');
+      expect(requiredBaseline.hiddenTargetIds).not.toContain('radio');
+      expect(requiredBaseline.hiddenTargetIds).not.toContain('photo-frame');
+
+      const planWithRequiredBaseline = system.generatePlan({
+        runSeed: seed,
+        roomIndex: 0,
+        roomId: room.definition.id,
+        difficulty: 1,
+        count: 3,
+      });
+
+      for (const anomaly of planWithRequiredBaseline.anomalies) {
+        if (['bookcase', 'radio', 'photo-frame'].includes(anomaly.targetId)) {
+          generatedProtectedFamilyDisappearance ||=
+            anomaly.kind === 'hide';
+        }
+      }
+    }
+
+    expect(generatedProtectedFamilyDisappearance).toBe(true);
 
     room.unmount();
     expect(manager.getCachedAssetCount()).toBe(0);

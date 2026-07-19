@@ -1,7 +1,13 @@
 const ROOM_COMPLETE_DURATION_MS = 2_400;
 
+export interface RoomCompleteBannerOptions {
+  readonly instruction?: string;
+  readonly persistent?: boolean;
+}
+
 export class RoomCompleteBanner {
   private readonly element: HTMLElement;
+  private readonly instruction: HTMLElement;
   private visibleUntil = 0;
 
   public constructor(root: HTMLElement) {
@@ -23,17 +29,28 @@ export class RoomCompleteBanner {
     title.className = 'room-complete-banner__title';
     title.textContent = 'ROOM CLEARED';
 
-    const instruction = document.createElement('p');
-    instruction.className = 'room-complete-banner__instruction';
-    instruction.textContent = 'THE EXIT IS OPEN';
+    this.instruction = document.createElement('p');
+    this.instruction.className = 'room-complete-banner__instruction';
+    this.instruction.textContent = 'THE EXIT IS OPEN';
 
-    panel.append(eyebrow, title, instruction);
+    panel.append(eyebrow, title, this.instruction);
     this.element.append(panel);
     root.append(this.element);
   }
 
-  public show(now = performance.now()): void {
-    this.visibleUntil = now + ROOM_COMPLETE_DURATION_MS;
+  public show(
+    options: RoomCompleteBannerOptions = {},
+    now = performance.now(),
+  ): void {
+    this.instruction.textContent =
+      options.instruction ?? 'THE EXIT IS OPEN';
+    this.element.classList.toggle(
+      'is-persistent',
+      options.persistent === true,
+    );
+    this.visibleUntil = options.persistent
+      ? Number.POSITIVE_INFINITY
+      : now + ROOM_COMPLETE_DURATION_MS;
     this.element.hidden = false;
   }
 
@@ -45,6 +62,7 @@ export class RoomCompleteBanner {
 
   public reset(): void {
     this.visibleUntil = 0;
+    this.element.classList.remove('is-persistent');
     this.element.hidden = true;
   }
 

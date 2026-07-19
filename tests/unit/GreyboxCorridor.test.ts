@@ -41,7 +41,7 @@ describe('GreyboxCorridor', () => {
     expect(room.definition).toMatchObject({
       id: 'first-corridor',
       displayName: 'Corridor',
-      observationDurationMs: 20_000,
+      observationDurationMs: 15_000,
       searchDurationMs: 45_000,
       anomalyCount: { min: 2, max: 2 },
     });
@@ -217,6 +217,20 @@ describe('GreyboxCorridor', () => {
         expected.scale ?? [1, 1, 1],
       );
     }
+
+    const storyClockDisplay = room
+      .getAnomalyTargetRegistry()
+      .getById('wall-clock')
+      ?.object.getObjectByName('STORY_CorridorClock_0317');
+    expect(storyClockDisplay).toBeDefined();
+    expect(storyClockDisplay?.position.toArray()).toEqual([0.022, 0, 0]);
+    expect(storyClockDisplay?.rotation.y).toBeCloseTo(Math.PI / 2);
+    expect(storyClockDisplay?.children).toHaveLength(18);
+    expect(
+      storyClockDisplay?.children.every((child) =>
+        child.layers.isEnabled(RENDER_LAYERS.scene),
+      ),
+    ).toBe(true);
 
     const positiveRotation = (targetId: string) =>
       room

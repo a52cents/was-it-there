@@ -1,39 +1,98 @@
+import type { GameMode } from '../gameplay/run/GameMode';
+
 const START_SCREEN_COPY = {
   title: 'WAS IT THERE?',
-  play: 'ENTER THE ROOM',
   loading: 'PREPARING THE ROOM',
+  modes: {
+    story: {
+      play: 'BEGIN THE STORY',
+    },
+    escape: {
+      play: 'START ESCAPE',
+    },
+  },
+  escapeLocked: 'Complete Story to unlock Escape.',
+  escapeUnlocked: 'Find the changes. Race to the exit.',
 } as const;
 
-type StartHandler = () => Promise<void> | void;
+type StartHandler = (mode: GameMode) => Promise<void> | void;
+type NotebookHandler = () => void;
 
 export class StartScreen {
   private startHandler: StartHandler | null = null;
+  private notebookHandler: NotebookHandler | null = null;
   private busy = true;
+  private selectedMode: GameMode = 'story';
+  private escapeUnlocked = false;
 
   public constructor(
     private readonly root: HTMLElement,
     title: HTMLHeadingElement,
     private readonly playButton: HTMLButtonElement,
+    private readonly storyModeButton: HTMLButtonElement,
+    private readonly escapeModeButton: HTMLButtonElement,
+    private readonly escapeModeDescription: HTMLElement,
+    private readonly notebookButton: HTMLButtonElement,
   ) {
     title.textContent = START_SCREEN_COPY.title;
     title.dataset.text = START_SCREEN_COPY.title;
-    this.playButton.textContent = START_SCREEN_COPY.play;
+    this.playButton.textContent = START_SCREEN_COPY.loading;
     this.playButton.disabled = true;
+    this.storyModeButton.disabled = true;
+    this.escapeModeButton.disabled = true;
+    this.notebookButton.disabled = true;
     this.playButton.addEventListener('click', this.handlePlayClick);
+    this.storyModeButton.addEventListener(
+      'click',
+      this.handleStoryModeClick,
+    );
+    this.escapeModeButton.addEventListener(
+      'click',
+      this.handleEscapeModeClick,
+    );
+    this.notebookButton.addEventListener(
+      'click',
+      this.handleNotebookClick,
+    );
+    this.setEscapeUnlocked(false);
   }
 
   public onStart(handler: StartHandler): void {
     this.startHandler = handler;
   }
 
+  public onNotebook(handler: NotebookHandler): void {
+    this.notebookHandler = handler;
+  }
+
   public setBusy(busy: boolean): void {
     this.busy = busy;
     this.playButton.disabled = busy;
+    this.storyModeButton.disabled = busy;
+    this.escapeModeButton.disabled = busy || !this.escapeUnlocked;
+    this.notebookButton.disabled = busy;
     this.playButton.textContent = busy
       ? START_SCREEN_COPY.loading
-      : START_SCREEN_COPY.play;
+      : START_SCREEN_COPY.modes[this.selectedMode].play;
     this.playButton.setAttribute('aria-busy', String(busy));
     this.root.classList.toggle('is-loading', busy);
+  }
+
+  public setEscapeUnlocked(unlocked: boolean): void {
+    this.escapeUnlocked = unlocked;
+
+    if (!unlocked && this.selectedMode === 'escape') {
+      this.selectedMode = 'story';
+      this.playButton.textContent = START_SCREEN_COPY.modes.story.play;
+    }
+
+    this.escapeModeButton.disabled = this.busy || !unlocked;
+    this.escapeModeButton.setAttribute('aria-disabled', String(!unlocked));
+    this.escapeModeButton.dataset.locked = String(!unlocked);
+    this.escapeModeDescription.textContent = unlocked
+      ? START_SCREEN_COPY.escapeUnlocked
+      : START_SCREEN_COPY.escapeLocked;
+    this.renderModeSelection();
   }
 
   public show(): void {
@@ -48,22 +107,78 @@ export class StartScreen {
 
   public dispose(): void {
     this.playButton.removeEventListener('click', this.handlePlayClick);
+    this.storyModeButton.removeEventListener(
+      'click',
+      this.handleStoryModeClick,
+    );
+    this.escapeModeButton.removeEventListener(
+      'click',
+      this.handleEscapeModeClick,
+    );
+    this.notebookButton.removeEventListener(
+      'click',
+      this.handleNotebookClick,
+    );
     this.startHandler = null;
+    this.notebookHandler = null;
   }
+
+  private selectMode(mode: GameMode): void {
+    if (
+      this.busy ||
+      this.selectedMode === mode ||
+      (mode === 'escape' && !this.escapeUnlocked)
+    ) {
+      return;
+    }
+
+    this.selectedMode = mode;
+    this.renderModeSelection();
+    this.playButton.textContent = START_SCREEN_COPY.modes[mode].play;
+  }
+
+  private renderModeSelection(): void {
+    const storySelected = this.selectedMode === 'story';
+    this.storyModeButton.classList.toggle('is-selected', storySelected);
+    this.storyModeButton.setAttribute(
+      'aria-pressed',
+      String(storySelected),
+    );
+    this.escapeModeButton.classList.toggle('is-selected', !storySelected);
+    this.escapeModeButton.setAttribute(
+      'aria-pressed',
+      String(!storySelected),
+    );
+  }
+
+  private readonly handleStoryModeClick = (): void => {
+    this.selectMode('story');
+  };
+
+  private readonly handleEscapeModeClick = (): void => {
+    this.selectMode('escape');
+  };
+
+  private readonly handleNotebookClick = (): void => {
+    if (!this.busy) {
+      this.notebookHandler?.();
+    }
+  };
 
   private readonly handlePlayClick = (): void => {
     if (this.busy || this.startHandler === null) {
       return;
     }
 
+    const mode = this.selectedMode;
     this.setBusy(true);
     this.hide();
-    void this.runStartHandler();
+    void this.runStartHandler(mode);
   };
 
-  private async runStartHandler(): Promise<void> {
+  private async runStartHandler(mode: GameMode): Promise<void> {
     try {
-      await this.startHandler?.();
+      await this.startHandler?.(mode);
     } catch (error: unknown) {
       this.show();
       console.error('Unable to start the game experience.', error);

@@ -275,7 +275,6 @@ const BATHROOM_ASSET_PLACEMENTS: readonly BathroomAssetPlacement[] = [
       { id: 'cup-red', color: '#a9585e' },
       { id: 'cup-green', color: '#5f846f' },
     ],
-    rotations: 'floor',
   },
   {
     key: 'soapDish',
@@ -292,7 +291,6 @@ const BATHROOM_ASSET_PLACEMENTS: readonly BathroomAssetPlacement[] = [
       { id: 'soap-purple', color: '#82658f' },
       { id: 'soap-orange', color: '#b5764e' },
     ],
-    rotations: 'floor',
   },
   {
     key: 'rubberDuck',
@@ -326,7 +324,6 @@ const BATHROOM_ASSET_PLACEMENTS: readonly BathroomAssetPlacement[] = [
       { id: 'holder-red', color: '#9b5559' },
       { id: 'holder-blue', color: '#587b8c' },
     ],
-    rotations: 'wall',
   },
   {
     key: 'toiletRolls',
@@ -343,7 +340,6 @@ const BATHROOM_ASSET_PLACEMENTS: readonly BathroomAssetPlacement[] = [
       { id: 'rolls-pink', color: '#b67b84' },
       { id: 'rolls-blue', color: '#7592a0' },
     ],
-    rotations: 'floor',
   },
   {
     key: 'slippers',
@@ -361,7 +357,6 @@ const BATHROOM_ASSET_PLACEMENTS: readonly BathroomAssetPlacement[] = [
       { id: 'slippers-purple', color: '#826892' },
       { id: 'slippers-yellow', color: '#b29154' },
     ],
-    rotations: 'floor',
   },
   {
     key: 'bin',
@@ -413,6 +408,7 @@ export class GreyboxBathroom extends RoomRuntime implements PlayableRoom {
   private assetLoadPromise: Promise<void> | null = null;
   private assetsLoaded = false;
   private buildRevision = 0;
+  private storyMirrorFog: THREE.Mesh | null = null;
 
   public constructor() {
     super('ROOM_GreyboxBathroom_VisualRoot', 'COLLIDER_GreyboxBathroom_Root');
@@ -440,6 +436,47 @@ export class GreyboxBathroom extends RoomRuntime implements PlayableRoom {
 
   public getLoadedAssetIds(): readonly string[] {
     return this.assetLease === null ? [] : [this.assetLease.assetId];
+  }
+
+  public setStoryMirrorFogVisible(visible: boolean): boolean {
+    if (this.storyMirrorFog === null) {
+      if (!visible) {
+        return true;
+      }
+
+      const mirror = this.anomalyTargetRegistry.getById('mirror');
+
+      if (mirror === null) {
+        return false;
+      }
+
+      const material = this.ownMaterial(
+        new THREE.MeshBasicMaterial({
+          color: '#b8cbca',
+          transparent: true,
+          opacity: 0.74,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+        }),
+      );
+      material.name = 'STORY_BathroomMirrorFog_Material';
+      this.storyMirrorFog = new THREE.Mesh(
+        this.ownGeometry(new THREE.PlaneGeometry(0.92, 0.76)),
+        material,
+      );
+      this.storyMirrorFog.name = 'STORY_BathroomMirrorFog';
+      this.storyMirrorFog.position.set(0, 0, 0.13);
+      this.storyMirrorFog.renderOrder = 9;
+      this.storyMirrorFog.layers.set(RENDER_LAYERS.scene);
+      mirror.object.add(this.storyMirrorFog);
+    }
+
+    this.storyMirrorFog.visible = visible;
+    return true;
+  }
+
+  public isStoryMirrorFogVisible(): boolean {
+    return this.storyMirrorFog?.visible === true;
   }
 
   public async loadAssets(assetManager?: AssetManager): Promise<void> {
@@ -542,6 +579,7 @@ export class GreyboxBathroom extends RoomRuntime implements PlayableRoom {
     this.exitDoorCollider = null;
     this.exitPortal = null;
     this.exitPortalLight = null;
+    this.storyMirrorFog = null;
   }
 
   private async performAssetLoad(

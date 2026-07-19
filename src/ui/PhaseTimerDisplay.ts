@@ -30,14 +30,23 @@ export class PhaseTimerDisplay {
     root.append(this.element);
   }
 
-  public update(state: GameState, timing: RunTimerSnapshot): void {
+  public update(
+    state: GameState,
+    timing: RunTimerSnapshot,
+    observationInstruction?: string,
+  ): void {
     if (timing.phase === null) {
       this.element.hidden = true;
       return;
     }
 
     const label =
-      state === 'paused' ? PHASE_COPY.paused : PHASE_COPY[timing.phase.phase];
+      state === 'paused'
+        ? PHASE_COPY.paused
+        : timing.phase.phase === 'observation' &&
+            observationInstruction !== undefined
+          ? observationInstruction
+          : PHASE_COPY[timing.phase.phase];
     const countdown = formatRemainingMilliseconds(timing.phase.remainingMs);
 
     if (label !== this.lastLabel) {
