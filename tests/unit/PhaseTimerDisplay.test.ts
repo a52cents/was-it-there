@@ -42,7 +42,7 @@ const OBSERVATION_SNAPSHOT: RunTimerSnapshot = {
 };
 
 describe('PhaseTimerDisplay', () => {
-  it('uses the authored Story examination mission without changing the default', () => {
+  it('always presents observation as room memorization', () => {
     const document = new FakeDocument();
     const root = new FakeElement(document);
     const display = new PhaseTimerDisplay(root as unknown as HTMLElement);
@@ -52,12 +52,5 @@ describe('PhaseTimerDisplay', () => {
 
     display.update('observation', OBSERVATION_SNAPSHOT);
     expect(label?.textContent).toBe('MEMORIZE THE ROOM');
-
-    display.update(
-      'observation',
-      OBSERVATION_SNAPSHOT,
-      'EXAMINE THE ROOM',
-    );
-    expect(label?.textContent).toBe('EXAMINE THE ROOM');
   });
 });

@@ -11,9 +11,14 @@ import {
 } from './LevelBuilderDocument';
 import {
   LevelBuilderPanel,
+  type LevelBuilderRoomOption,
   type LevelBuilderTransformMode,
 } from './LevelBuilderPanel';
 import { LevelBuilderSession } from './LevelBuilderSession';
+import {
+  LEVEL_BUILDER_SNAP_PRESETS,
+  type LevelBuilderSnapPreset,
+} from './LevelBuilderSnap';
 
 export interface LevelBuilderRuntimeOptions {
   readonly scene: THREE.Scene;
@@ -22,10 +27,12 @@ export interface LevelBuilderRuntimeOptions {
   readonly panelRoot: HTMLElement;
   readonly roomId: string;
   readonly roomRoot: THREE.Object3D;
+  readonly rooms: readonly LevelBuilderRoomOption[];
   readonly anomalyTargets: AnomalyTargetRegistry;
   readonly gameLoop: GameLoop;
   readonly onOpen: () => void;
   readonly onClose: () => void;
+  readonly onRoomChange: (roomIndex: number) => Promise<void>;
   readonly onObjectChanged: () => void;
 }
 
@@ -51,6 +58,7 @@ export class LevelBuilderRuntime {
   private startedLoopForEditor = false;
   private pointerDownPosition: THREE.Vector2 | null = null;
   private skipNextCanvasSelection = false;
+  private layoutDirty = false;
 
   public constructor(private readonly options: LevelBuilderRuntimeOptions) {
     this.session = new LevelBuilderSession(
@@ -72,9 +80,7 @@ export class LevelBuilderRuntime {
     );
     this.transformControls.enabled = false;
     this.transformControls.setMode('translate');
-    this.transformControls.setTranslationSnap(0.05);
-    this.transformControls.setRotationSnap(THREE.MathUtils.degToRad(5));
-    this.transformControls.setScaleSnap(0.05);
+    this.setSnapPreset('normal');
     this.transformControls.setSize(0.82);
     this.transformHelper = this.transformControls.getHelper();
     this.transformHelper.name = 'LEVEL_BUILDER_TransformGizmo';
@@ -96,10 +102,16 @@ export class LevelBuilderRuntime {
 
     this.panel = new LevelBuilderPanel(options.panelRoot, {
       roomRoot: options.roomRoot,
+      roomId: options.roomId,
+      rooms: options.rooms,
       session: this.session,
       onClose: () => this.close(),
       onSelectObject: (object) => this.selectObject(object),
       onTransformModeChange: (mode) => this.setTransformMode(mode),
+      onSnapPresetChange: (preset) => this.setSnapPreset(preset),
+      onDuplicateSelection: () => this.duplicateSelection(),
+      onRemoveSelection: () => this.removeSelection(),
+      onRoomChange: (roomIndex) => this.changeRoom(roomIndex),
       onFocusSelection: () => this.focusSelection(),
       onObjectChanged: () => this.handleEditedObjectChanged(),
     });
@@ -143,6 +155,11 @@ export class LevelBuilderRuntime {
       return;
     }
 
+    for (const addition of this.session.clearAdditions()) {
+      this.originalStates.delete(addition);
+      disposeClonedMaterials(addition);
+    }
+
     for (const [object, state] of this.originalStates) {
       applyLevelBuilderObjectState(object, state);
     }
@@ -159,6 +176,7 @@ export class LevelBuilderRuntime {
     this.options.camera.quaternion.copy(this.savedCameraQuaternion);
     this.options.camera.updateMatrixWorld(true);
     this.openState = false;
+    this.layoutDirty = false;
     this.options.onObjectChanged();
     if (!this.disposing) {
       this.options.onClose();
@@ -282,6 +300,130 @@ export class LevelBuilderRuntime {
     this.transformControls.setMode(mode);
   }
 
+  private setSnapPreset(preset: LevelBuilderSnapPreset): void {
+    const snap = LEVEL_BUILDER_SNAP_PRESETS[preset];
+    this.transformControls.setTranslationSnap(snap.translation);
+    this.transformControls.setRotationSnap(
+      snap.rotationDegrees === null
+        ? null
+        : THREE.MathUtils.degToRad(snap.rotationDegrees),
+    );
+    this.transformControls.setScaleSnap(snap.scale);
+  }
+
+  private changeRoom(roomIndex: number): Promise<void> {
+    if (
+      this.layoutDirty &&
+      !window.confirm(
+        'This level has unexported layout changes. Switch levels and discard them?',
+      )
+    ) {
+      return Promise.reject(
+        new Error('Level change cancelled. Export the layout before switching.'),
+      );
+    }
+
+    return this.options.onRoomChange(roomIndex);
+  }
+
+  private duplicateSelection(): void {
+    const selection = this.session.getSelection();
+
+    if (selection === null) {
+      this.panel.setStatus('Select furniture before duplicating it.', true);
+      return;
+    }
+
+    if (
+      selection.reference.anomalyTargetId === undefined &&
+      !this.session.isAddition(selection.object)
+    ) {
+      this.panel.setStatus(
+        'Only registered furniture can be duplicated.',
+        true,
+      );
+      return;
+    }
+
+    const copy = cloneFurnitureObject(selection.object);
+    copy.name = this.createUniqueCopyName(selection.object.name || 'Object');
+    selection.object.updateWorldMatrix(true, false);
+    this.options.roomRoot.updateWorldMatrix(true, false);
+    const localMatrix = this.options.roomRoot.matrixWorld
+      .clone()
+      .invert()
+      .multiply(selection.object.matrixWorld);
+    localMatrix.decompose(copy.position, copy.quaternion, copy.scale);
+    copy.position.x += 0.5;
+    this.options.roomRoot.add(copy);
+    this.session.registerAddition(copy, selection.object);
+    this.layoutDirty = true;
+    this.selectObject(copy);
+    this.panel.rebuildSceneHierarchy();
+    this.options.onObjectChanged();
+    this.panel.setStatus(`Added ${copy.name}.`);
+  }
+
+  private removeSelection(): void {
+    const selection = this.session.getSelection();
+
+    if (selection === null) {
+      this.panel.setStatus('Select furniture before removing it.', true);
+      return;
+    }
+
+    const { object, reference } = selection;
+    this.transformControls.detach();
+    this.selectionHelper.visible = false;
+
+    if (this.session.isAddition(object)) {
+      this.session.removeAddition(object);
+      this.layoutDirty = true;
+      this.originalStates.delete(object);
+      disposeClonedMaterials(object);
+      this.panel.rebuildSceneHierarchy();
+      this.options.onObjectChanged();
+      this.panel.setStatus(`Removed ${object.name || object.type}.`);
+      return;
+    }
+
+    if (reference.anomalyTargetId === undefined) {
+      this.transformControls.attach(object);
+      this.selectionHelper.visible = true;
+      this.panel.setStatus(
+        'Walls, doors, and technical objects are protected.',
+        true,
+      );
+      return;
+    }
+
+    object.visible = false;
+    this.layoutDirty = true;
+    this.session.captureAfter();
+    this.session.select(null);
+    this.options.onObjectChanged();
+    this.panel.refresh();
+    this.panel.setStatus(`Removed ${object.name || object.type} from the layout.`);
+  }
+
+  private createUniqueCopyName(sourceName: string): string {
+    const baseName = `${sourceName}_Copy`;
+    const existingNames = new Set(
+      this.options.roomRoot.children.map((child) => child.name),
+    );
+
+    if (!existingNames.has(baseName)) {
+      return baseName;
+    }
+
+    let suffix = 2;
+    while (existingNames.has(`${baseName}_${String(suffix)}`)) {
+      suffix += 1;
+    }
+
+    return `${baseName}_${String(suffix)}`;
+  }
+
   private focusSelection(): void {
     const selection = this.session.getSelection();
 
@@ -333,6 +475,7 @@ export class LevelBuilderRuntime {
   }
 
   private handleEditedObjectChanged(): void {
+    this.layoutDirty = true;
     const selection = this.session.getSelection();
 
     if (selection !== null) {
@@ -445,6 +588,65 @@ function isDescendantOf(object: THREE.Object3D, root: THREE.Object3D): boolean {
   }
 
   return false;
+}
+
+function cloneFurnitureObject(source: THREE.Object3D): THREE.Object3D {
+  const clone = source.clone(true);
+  const technicalObjects: THREE.Object3D[] = [];
+
+  clone.traverse((object) => {
+    if (object !== clone && isTechnicalEditorObject(object)) {
+      technicalObjects.push(object);
+    }
+  });
+
+  for (const object of technicalObjects) {
+    object.removeFromParent();
+  }
+
+  clone.traverse((object) => {
+    const mesh = object as THREE.Mesh;
+    if (!mesh.isMesh) {
+      return;
+    }
+
+    mesh.material = Array.isArray(mesh.material)
+      ? mesh.material.map((material) => material.clone())
+      : mesh.material.clone();
+  });
+
+  return clone;
+}
+
+function disposeClonedMaterials(root: THREE.Object3D): void {
+  root.traverse((object) => {
+    const mesh = object as THREE.Mesh;
+
+    if (!mesh.isMesh) {
+      return;
+    }
+
+    if (Array.isArray(mesh.material)) {
+      for (const material of mesh.material) {
+        material.dispose();
+      }
+    } else {
+      mesh.material.dispose();
+    }
+  });
+}
+
+function isTechnicalEditorObject(object: THREE.Object3D): boolean {
+  return (
+    object.name.startsWith('INTERACT_') ||
+    object.name.startsWith('REPORT_') ||
+    object.name.startsWith('COLLIDER_') ||
+    object.name.startsWith('LEVEL_BUILDER_') ||
+    (
+      object.layers.isEnabled(RENDER_LAYERS.interaction) &&
+      !object.layers.isEnabled(RENDER_LAYERS.scene)
+    )
+  );
 }
 
 function isTextEditingTarget(target: EventTarget | null): boolean {

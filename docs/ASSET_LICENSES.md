@@ -172,3 +172,41 @@ les GLB déjà référencés de la chambre et du premier couloir : mobilier Kenn
 cadres et accessoires KayKit, ainsi que le téléphone et l’horloge Poly Pizza
 déjà attribués ci-dessus. Les identifiants d’assets restent identiques afin que
 le cache partage les sources pendant le préchargement du bureau.
+
+## Réutilisation — cuisine
+
+La cuisine utilise dix-neuf GLB supplémentaires extraits de l’archive locale
+Kenney Furniture Kit déjà enregistrée ci-dessus. La sélection comprend les
+meubles bas et hauts, l’évier, le réfrigérateur, la cuisinière, la hotte,
+l’îlot, le coin repas, les luminaires et les petits accessoires. Aucun asset
+externe supplémentaire ni aucune ressource Poly Pizza n’a été nécessaire.
+
+Les fichiers sont conservés dans `src/assets/models/kitchen/` sous des noms
+alignés sur les conventions du projet. Ils totalisent `249 704` octets et
+restent inchangés sur disque ; seule leur palette est harmonisée au runtime.
+
+## Réutilisation — salle à manger
+
+La salle à manger utilise dix GLB supplémentaires extraits de l’archive locale
+Kenney Furniture Kit déjà enregistrée ci-dessus. Cette sélection distincte
+comprend une table nappée, une chaise moderne, un buffet, un tapis arrondi, un
+ventilateur de plafond et le mobilier complet de l’alcôve. Aucun nouvel asset
+externe ni aucune ressource Poly Pizza n’a été nécessaire.
+
+Les fichiers sont conservés dans `src/assets/models/dining-room/`. Ils totalisent
+`128 820` octets et restent inchangés sur disque ; le runtime ajuste uniquement
+leur palette, leur orientation et leur taille dans la pièce.
+
+## Poly Haven — Kloppenheim 07 Pure Sky HDRI
+
+- Asset : Kloppenheim 07 (Pure Sky).
+- Auteurs : Greg Zaal (original) et Jarod Guest (édition du ciel).
+- Source : https://polyhaven.com/a/kloppenheim_07_puresky
+- Licence : Creative Commons Zero 1.0 Universal (CC0).
+- Fichier local : `src/assets/environment/kloppenheim-07-pure-sky-1k.hdr`.
+- Résolution de production : 1K HDR, choisie pour limiter le poids du build web.
+- Taille : `1 282 823` octets.
+- SHA-256 :
+  `C18AA40364D1B5AA788F309F1C64D891C386E6F8E7D958C329F7470489E04F8A`.
+- Usage : ciel nocturne couvert, vue extérieure des fenêtres et éclairage
+  indirect très léger contrôlé par les blackouts et la pression de la maison.

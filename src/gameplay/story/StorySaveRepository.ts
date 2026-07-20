@@ -1,3 +1,4 @@
+import { STORY_EASTER_EGG_DISCOVERY_IDS } from '../../content/story/StoryLoopAnchor';
 import type { StoryFlagValue } from './StoryEvent';
 import type { PersistentStoryProgressSnapshot } from './StoryProgress';
 
@@ -23,6 +24,11 @@ interface LegacyStoryAccessSaveV1 {
   readonly version: 1;
   readonly escapeUnlocked: boolean;
 }
+
+const LEGACY_DISCOVERY_ID_MIGRATIONS: Readonly<Record<string, string>> = {
+  'bedroom-page-317': STORY_EASTER_EGG_DISCOVERY_IDS.bedroomPage,
+  'bathroom-duck-317': STORY_EASTER_EGG_DISCOVERY_IDS.bathroomDuck,
+};
 
 export class StorySaveRepository {
   public constructor(
@@ -136,7 +142,10 @@ function normalizeProgress(
     loopNumber: progress.loopNumber,
     completedLoopCount: progress.completedLoopCount,
     failedLoopCount: progress.failedLoopCount,
-    discoveries: [...new Set(progress.discoveries)].sort(),
+    discoveries: normalizeIdentifiers(
+      progress.discoveries,
+      LEGACY_DISCOVERY_ID_MIGRATIONS,
+    ),
     fragments: [...new Set(progress.fragments)].sort(),
     triggeredEventIds: [...new Set(progress.triggeredEventIds)].sort(),
     flags: Object.fromEntries(
@@ -147,6 +156,17 @@ function normalizeProgress(
     chapterOutcomeIds: [...new Set(progress.chapterOutcomeIds)].sort(),
     endingIds: [...new Set(progress.endingIds)].sort(),
   };
+}
+
+function normalizeIdentifiers(
+  identifiers: readonly string[],
+  migrations: Readonly<Record<string, string>> = {},
+): string[] {
+  return [
+    ...new Set(
+      identifiers.map((identifier) => migrations[identifier] ?? identifier),
+    ),
+  ].sort();
 }
 
 function isStorySaveV1(value: unknown): value is StorySaveV1 {

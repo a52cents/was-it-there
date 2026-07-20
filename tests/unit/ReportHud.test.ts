@@ -69,7 +69,7 @@ function getElement(
 }
 
 describe('ReportHud story prompts', () => {
-  it('distinguishes EXAMINE during Story from REPORT during search', () => {
+  it('shows a neutral observation cursor before interactive prompts unlock', () => {
     const document = new FakeDocument();
     const root = document.createElement('div');
     const hud = new ReportHud(root as unknown as HTMLElement);
@@ -79,6 +79,22 @@ describe('ReportHud story prompts', () => {
     hud.update(
       {
         state: 'observation',
+        remainingCount: 0,
+        aimedAtTarget: true,
+        storyInteractionLabel: null,
+        errorCount: 0,
+        maximumErrors: 3,
+      },
+      0,
+    );
+
+    expect(reticle.hidden).toBe(false);
+    expect(reticle.classList.contains('is-story')).toBe(false);
+    expect(label.hidden).toBe(true);
+
+    hud.update(
+      {
+        state: 'room-complete',
         remainingCount: 0,
         aimedAtTarget: true,
         storyInteractionLabel: 'EXAMINE',

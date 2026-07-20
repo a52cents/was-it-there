@@ -127,6 +127,28 @@ describe('RunTimer', () => {
     });
   });
 
+  it('continues a finished run without erasing its time or penalties', () => {
+    const clock = new ManualClock();
+    const timer = new RunTimer(clock);
+    timer.startRun();
+    clock.advance(3_000);
+    timer.addPenalty('incorrectReport');
+    timer.stop();
+    clock.advance(8_000);
+
+    expect(timer.continueFinishedRun()).toBe(true);
+    clock.advance(1_000);
+
+    expect(timer.getSnapshot()).toMatchObject({
+      running: true,
+      finished: false,
+      activeTimeMs: 4_000,
+      penaltyTimeMs: 5_000,
+      finalTimeMs: 9_000,
+    });
+    expect(timer.continueFinishedRun()).toBe(false);
+  });
+
   it('rejects phases and penalties before a run starts', () => {
     const timer = new RunTimer(new ManualClock());
 

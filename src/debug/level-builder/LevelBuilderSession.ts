@@ -16,6 +16,7 @@ import {
 } from './LevelBuilderDocument';
 import {
   LEVEL_BUILDER_LAYOUT_FORMAT_VERSION,
+  type LevelBuilderLayoutAddition,
   type LevelBuilderLayoutDocument,
   type LevelBuilderLayoutObject,
 } from './LevelBuilderLayoutDocument';
@@ -30,6 +31,11 @@ export interface LevelBuilderSelectionSnapshot {
 export class LevelBuilderSession {
   private selection: LevelBuilderSelectionSnapshot | null = null;
   private variants: LevelBuilderVariantDefinition[] = [];
+  private readonly additions = new Map<
+    THREE.Object3D,
+    { readonly id: string; readonly source: LevelBuilderObjectReference }
+  >();
+  private nextAdditionIndex = 1;
 
   public constructor(
     private readonly roomId: string,
@@ -60,6 +66,61 @@ export class LevelBuilderSession {
 
   public getSelection(): LevelBuilderSelectionSnapshot | null {
     return this.selection;
+  }
+
+  public registerAddition(
+    object: THREE.Object3D,
+    sourceObject: THREE.Object3D,
+  ): void {
+    if (object.parent !== this.roomRoot) {
+      throw new Error('Added Level Builder objects must be room-root children.');
+    }
+
+    const inheritedSource = this.additions.get(sourceObject)?.source;
+    const source = inheritedSource ?? createLevelBuilderObjectReference(
+      this.roomRoot,
+      sourceObject,
+      this.getAnomalyTargetId(sourceObject),
+    );
+    const id = `added-${slugify(source.name)}-${String(this.nextAdditionIndex)}`;
+    this.nextAdditionIndex += 1;
+    this.additions.set(object, { id, source });
+  }
+
+  public isAddition(object: THREE.Object3D): boolean {
+    return this.additions.has(object);
+  }
+
+  public removeAddition(object: THREE.Object3D): boolean {
+    if (!this.additions.delete(object)) {
+      return false;
+    }
+
+    if (this.selection?.object === object) {
+      this.selection = null;
+    }
+
+    object.removeFromParent();
+    return true;
+  }
+
+  public getAdditions(): readonly THREE.Object3D[] {
+    return [...this.additions.keys()];
+  }
+
+  public clearAdditions(): readonly THREE.Object3D[] {
+    const objects = this.getAdditions();
+    this.additions.clear();
+
+    if (this.selection !== null && objects.includes(this.selection.object)) {
+      this.selection = null;
+    }
+
+    for (const object of objects) {
+      object.removeFromParent();
+    }
+
+    return objects;
   }
 
   public captureBefore(): LevelBuilderSelectionSnapshot {
@@ -111,6 +172,15 @@ export class LevelBuilderSession {
     id: string,
     kind: LevelBuilderVariantKind,
   ): LevelBuilderVariantValidation {
+    const currentSelection = this.requireSelection();
+
+    if (this.isAddition(currentSelection.object)) {
+      return {
+        valid: false,
+        errors: ['Added layout objects cannot define anomaly variants.'],
+      };
+    }
+
     const selection = this.captureAfter();
     const variant: LevelBuilderVariantDefinition = {
       id: id.trim(),
@@ -163,6 +233,7 @@ export class LevelBuilderSession {
 
   public createLayoutDocument(): LevelBuilderLayoutDocument {
     const objects: LevelBuilderLayoutObject[] = [];
+    const additions: LevelBuilderLayoutAddition[] = [];
 
     this.roomRoot.traverse((object) => {
       const targetId = this.getAnomalyTargetId(object);
@@ -187,11 +258,30 @@ export class LevelBuilderSession {
     });
     objects.sort((left, right) => left.targetId.localeCompare(right.targetId));
 
+    for (const [object, addition] of this.additions) {
+      additions.push({
+        id: addition.id,
+        source: addition.source,
+        nodeName: object.name,
+        position: [object.position.x, object.position.y, object.position.z],
+        quaternion: [
+          object.quaternion.x,
+          object.quaternion.y,
+          object.quaternion.z,
+          object.quaternion.w,
+        ],
+        scale: [object.scale.x, object.scale.y, object.scale.z],
+        visible: object.visible,
+      });
+    }
+    additions.sort((left, right) => left.id.localeCompare(right.id));
+
     return {
       formatVersion: LEVEL_BUILDER_LAYOUT_FORMAT_VERSION,
       documentType: 'room-layout',
       roomId: this.roomId,
       objects,
+      additions,
     };
   }
 
@@ -223,4 +313,14 @@ export class LevelBuilderSession {
 
     return this.selection;
   }
+}
+
+function slugify(value: string): string {
+  const slug = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, '-')
+    .replace(/^-|-$/gu, '');
+
+  return slug.length > 0 ? slug : 'object';
 }

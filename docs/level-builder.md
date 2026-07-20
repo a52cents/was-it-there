@@ -7,12 +7,21 @@ de les raccorder au générateur du jeu.
 ## Ouverture
 
 1. Lancer le projet avec `pnpm dev`.
-2. Cliquer sur `OPEN LEVEL BUILDER` dans le panneau debug.
-3. Le jeu libère la souris et met la manche en pause automatiquement.
+2. Appuyer sur `H` pour afficher le panneau debug.
+3. Cliquer sur `OPEN LEVEL BUILDER`.
+4. Le jeu libère la souris et met la manche en pause automatiquement.
 
 Le bouton `CLOSE` restaure tous les objets modifiés pendant la session. Si une
 partie était en cours, le jeu redemande ensuite le pointer lock et reprend la
 manche.
+
+La section `LEVEL` permet de charger directement les six salles construites
+(chambre, salle de bain, couloir, bureau, cuisine et salle à manger). Le nouveau Level Builder se rouvre
+automatiquement dans la salle choisie : il n'est pas nécessaire de terminer les
+salles précédentes.
+
+Changer de salle restaure la salle courante. Si le layout a été modifié, une
+confirmation rappelle de l'exporter avant le changement.
 
 ## Navigation et sélection
 
@@ -33,9 +42,23 @@ est affiché entre crochets.
 - `E` : rotation ;
 - `R` : échelle.
 
-Les gizmos utilisent un pas de 5 cm pour le déplacement, 5 degrés pour la
-rotation et 0,05 pour l'échelle. La visibilité et la couleur peuvent être
-modifiées dans la section `BEFORE / AFTER`.
+Le menu `SNAPPING` propose uniquement quatre réglages : `OFF`, `FINE` (1 cm,
+1 degré, 0,01), `NORMAL` (5 cm, 5 degrés, 0,05) et `COARSE` (25 cm, 15 degrés,
+0,10). La visibilité et la couleur peuvent être modifiées dans la section
+`BEFORE / AFTER`.
+
+## Ajouter et retirer du mobilier
+
+- `DUPLICATE OBJECT` crée une copie visuelle du meuble sélectionné et la décale
+  de 50 cm pour qu'elle soit immédiatement visible ;
+- `REMOVE OBJECT` retire une copie ajoutée ou masque un meuble existant dans le
+  layout exporté ;
+- les murs, portes et objets techniques restent protégés ;
+- une copie sert au placement canonique et ne peut pas devenir directement une
+  variante d'anomalie.
+
+Une suppression de meuble existant peut être annulée pendant la session en le
+resélectionnant dans la hiérarchie et en recochant `VISIBLE`.
 
 ## Création d'une variante
 
@@ -82,8 +105,10 @@ variante d'anomalie n'est nécessaire :
 6. Transmettre le fichier `<room-id>-layout.json` pour intégrer ces valeurs au
    placement de base de la salle.
 
-L'export contient l'état actuel de toutes les cibles de la salle, triées par
-identifiant : position locale, quaternion, échelle et visibilité. `CLOSE`
+L'export layout version 2 contient l'état actuel de toutes les cibles de la
+salle, triées par identifiant : position locale, quaternion, échelle et
+visibilité. Il contient aussi chaque copie ajoutée avec sa source et sa
+transformation. Un meuble retiré est exporté avec `visible: false`. `CLOSE`
 restaure toujours la salle telle qu'elle était avant l'ouverture de l'éditeur ;
 le JSON exporté conserve les placements effectués.
 

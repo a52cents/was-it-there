@@ -73,11 +73,11 @@ describe('generateAnomalyPlan', () => {
   it('can deterministically reach every currently applicable anomaly kind', () => {
     const kinds = new Set<string>();
 
-    for (let seed = 0; seed < 2_000 && kinds.size < 3; seed += 1) {
+    for (let seed = 0; seed < 2_000 && kinds.size < 2; seed += 1) {
       kinds.add(generate(seed).anomalies[0]?.kind ?? '');
     }
 
-    expect(kinds).toEqual(new Set(['hide', 'rotate', 'color']));
+    expect(kinds).toEqual(new Set(['hide', 'color']));
   });
 
   it('rejects an unreachable requested anomaly count explicitly', () => {

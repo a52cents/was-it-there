@@ -16,6 +16,7 @@ function createAdapter(
     gameplayStart: vi.fn(),
     gameplayStop: vi.fn(),
     requestInterstitial: vi.fn(() => Promise.resolve()),
+    isRewardedAdAvailable: vi.fn(() => false),
     requestRewardedAd: vi.fn(() => Promise.resolve(false)),
     submitEscapeTime: vi.fn(() => Promise.resolve()),
     getLocale: vi.fn(() => 'en'),

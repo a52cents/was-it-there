@@ -58,6 +58,8 @@ export function generateAnomalyPlan(
       target,
       variants: validateAndGetVariants(target, options.roomId, roomSeed),
     }));
+  const dependentTargetIdsByTargetId =
+    createDependentTargetIdMap(options.targets);
 
   if (options.count > candidates.length) {
     throw new Error(
@@ -68,14 +70,60 @@ export function generateAnomalyPlan(
   const anomalies: PlannedAnomaly[] = [];
 
   while (anomalies.length < options.count) {
-    const targetIndex = pickWeightedTargetIndex(candidates, random);
-    const [candidate] = candidates.splice(targetIndex, 1);
+    const remainingAfterSelection =
+      options.count - anomalies.length - 1;
+    const selectableCandidates = candidates
+      .map((candidate) => ({
+        ...candidate,
+        variants: candidate.variants.filter(
+          (variant) =>
+            isCompatibleWithSelectedAnomalies(
+              candidate.target,
+              variant,
+              anomalies,
+              dependentTargetIdsByTargetId,
+            ) &&
+            leavesEnoughCompatibleTargets(
+              candidate.target,
+              variant,
+              candidates,
+              anomalies,
+              dependentTargetIdsByTargetId,
+              remainingAfterSelection,
+            ),
+        ),
+      }))
+      .filter((candidate) => candidate.variants.length > 0);
+
+    if (selectableCandidates.length === 0) {
+      throw new Error(
+        `Room "${options.roomId}" cannot complete a ${options.count}-anomaly plan without combining a hidden support with one of its dependent targets (seed ${roomSeed}).`,
+      );
+    }
+
+    const targetIndex = pickWeightedTargetIndex(
+      selectableCandidates,
+      random,
+    );
+    const candidate = selectableCandidates[targetIndex];
 
     if (candidate === undefined) {
       throw new Error(
         `Room "${options.roomId}" exhausted anomaly targets unexpectedly (seed ${roomSeed}).`,
       );
     }
+
+    const sourceCandidateIndex = candidates.findIndex(
+      ({ target }) => target.id === candidate.target.id,
+    );
+
+    if (sourceCandidateIndex < 0) {
+      throw new Error(
+        `Room "${options.roomId}" lost anomaly target "${candidate.target.id}" while generating its plan (seed ${roomSeed}).`,
+      );
+    }
+
+    candidates.splice(sourceCandidateIndex, 1);
 
     const variant =
       candidate.variants[random.nextInteger(candidate.variants.length)];
@@ -101,6 +149,111 @@ export function generateAnomalyPlan(
     difficulty: options.difficulty,
     anomalies,
   };
+}
+
+function createDependentTargetIdMap(
+  targets: readonly AnomalyTarget[],
+): ReadonlyMap<string, ReadonlySet<string>> {
+  const targetsById = new Map(
+    targets.map((target) => [target.id, target] as const),
+  );
+  const result = new Map<string, ReadonlySet<string>>();
+
+  for (const target of targets) {
+    const dependentTargetIds = new Set<string>();
+    const pendingTargetIds = [...(target.dependentTargetIds ?? [])];
+
+    while (pendingTargetIds.length > 0) {
+      const dependentTargetId = pendingTargetIds.pop();
+
+      if (
+        dependentTargetId === undefined ||
+        dependentTargetId === target.id ||
+        dependentTargetIds.has(dependentTargetId)
+      ) {
+        continue;
+      }
+
+      dependentTargetIds.add(dependentTargetId);
+      const dependentTarget = targetsById.get(dependentTargetId);
+      pendingTargetIds.push(...(dependentTarget?.dependentTargetIds ?? []));
+    }
+
+    result.set(target.id, dependentTargetIds);
+  }
+
+  return result;
+}
+
+function isCompatibleWithSelectedAnomalies(
+  target: AnomalyTarget,
+  variant: PreparedAnomalyVariant,
+  selectedAnomalies: readonly PlannedAnomaly[],
+  dependentTargetIdsByTargetId: ReadonlyMap<
+    string,
+    ReadonlySet<string>
+  >,
+): boolean {
+  for (const selected of selectedAnomalies) {
+    if (
+      selected.kind === 'hide' &&
+      dependentTargetIdsByTargetId
+        .get(selected.targetId)
+        ?.has(target.id) === true
+    ) {
+      return false;
+    }
+
+    if (
+      variant.kind === 'hide' &&
+      dependentTargetIdsByTargetId
+        .get(target.id)
+        ?.has(selected.targetId) === true
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function leavesEnoughCompatibleTargets(
+  target: AnomalyTarget,
+  variant: PreparedAnomalyVariant,
+  candidates: readonly EligibleTarget[],
+  selectedAnomalies: readonly PlannedAnomaly[],
+  dependentTargetIdsByTargetId: ReadonlyMap<
+    string,
+    ReadonlySet<string>
+  >,
+  requiredTargetCount: number,
+): boolean {
+  if (requiredTargetCount === 0) {
+    return true;
+  }
+
+  const prospectiveAnomalies: readonly PlannedAnomaly[] = [
+    ...selectedAnomalies,
+    {
+      targetId: target.id,
+      kind: variant.kind,
+      variantId: variant.id,
+    },
+  ];
+  const compatibleTargetCount = candidates.filter(
+    (candidate) =>
+      candidate.target.id !== target.id &&
+      candidate.variants.some((candidateVariant) =>
+        isCompatibleWithSelectedAnomalies(
+          candidate.target,
+          candidateVariant,
+          prospectiveAnomalies,
+          dependentTargetIdsByTargetId,
+        ),
+      ),
+  ).length;
+
+  return compatibleTargetCount >= requiredTargetCount;
 }
 
 function validateGenerationOptions(options: GenerateAnomalyPlanOptions): void {

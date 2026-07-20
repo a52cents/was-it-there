@@ -38,6 +38,22 @@ describe('RunErrorTracker', () => {
     );
   });
 
+  it('grants exactly one extra error allowance after Game Over', () => {
+    const errors = new RunErrorTracker();
+    errors.recordError('timeout');
+    errors.recordError('incorrect-report');
+    errors.recordError('timeout');
+
+    expect(errors.grantExtraLife()).toEqual({
+      errorCount: 2,
+      maximumErrors: MAX_RUN_ERRORS,
+      remainingErrors: 1,
+      lastError: null,
+      gameOver: false,
+    });
+    expect(() => errors.grantExtraLife()).toThrow(/after game over/u);
+  });
+
   it('resets every error field for a new run', () => {
     const errors = new RunErrorTracker();
     errors.recordError('incorrect-report');

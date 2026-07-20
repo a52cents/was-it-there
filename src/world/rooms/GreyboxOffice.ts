@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OFFICE_ASSET_CATALOG } from '../../content/rooms/OfficeAssetCatalog';
+import { STORY_LOOP_ANCHOR } from '../../content/story/StoryLoopAnchor';
 import {
   captureAnomalyCollisionObjectState,
   captureAnomalyTargetInitialState,
@@ -14,6 +15,8 @@ import {
 } from '../assets/AssetManager';
 import type { RoomDefinition } from '../RoomDefinition';
 import { RoomRuntime } from '../RoomRuntime';
+import { createAgedPlasterTexture } from '../textures/AgedPlasterTexture';
+import { createWoodPlankFloorTexture } from '../textures/ProceduralFloorTexture';
 import type { PlayableRoom } from './PlayableRoom';
 
 type Vector2Tuple = readonly [number, number];
@@ -87,8 +90,6 @@ const EAST_X = 4.2;
 const NORTH_Z = -3.2;
 const BAY_NORTH_Z = -4.8;
 const EXIT_CENTER_Z = 1.2;
-const FLOOR_ROTATION_ANOMALY_RADIANS = Math.PI / 6;
-const WALL_ROTATION_ANOMALY_RADIANS = Math.PI / 12;
 
 const OFFICE_FOOTPRINT: readonly Vector2Tuple[] = [
   [-4.2, SOUTH_Z],
@@ -107,10 +108,12 @@ const OFFICE_ASSET_PLACEMENTS: readonly OfficeAssetPlacement[] = [
     targetId: 'desk',
     objectName: 'ANOM_Office_Desk',
     position: [0.25, 0, -0.35],
+    quaternion: [0, 1, 0, 0],
+    scale: [1.15, 1.15, 1.15],
     rotationY: 0,
     maximumSize: [2.25, 0.82, 0.9],
     verticalAnchor: 'ground',
-    interactionSize: [2.38, 0.94, 1.02],
+    interactionSize: [1.26, 0.9, 0.59],
     interactionPosition: [0, 0.41, 0],
     tint: '#b49370',
     anomalyColors: [
@@ -129,7 +132,9 @@ const OFFICE_ASSET_PLACEMENTS: readonly OfficeAssetPlacement[] = [
     key: 'officeChair',
     targetId: 'office-chair',
     objectName: 'ANOM_Office_Chair',
-    position: [0.25, 0, -1.55],
+    position: [0.25, 0, -1.05],
+    quaternion: [0, 1, 0, 0],
+    scale: [1.25, 1.25, 1.25],
     rotationY: Math.PI,
     maximumSize: [0.84, 1.05, 0.84],
     verticalAnchor: 'ground',
@@ -146,7 +151,7 @@ const OFFICE_ASSET_PLACEMENTS: readonly OfficeAssetPlacement[] = [
     key: 'deskLamp',
     targetId: 'desk-lamp',
     objectName: 'ANOM_Office_DeskLamp',
-    position: [-0.52, 0.83, -0.46],
+    position: [-0.25, 0.95, -0.2],
     rotationY: 0.35,
     maximumSize: [0.38, 0.5, 0.38],
     verticalAnchor: 'ground',
@@ -163,7 +168,8 @@ const OFFICE_ASSET_PLACEMENTS: readonly OfficeAssetPlacement[] = [
     key: 'officePhone',
     targetId: 'office-phone',
     objectName: 'ANOM_Office_Phone',
-    position: [0.78, 0.83, -0.5],
+    position: [0.78, 0.93, -0.2],
+    scale: [1.15, 1.15, 1.15],
     rotationY: Math.PI,
     maximumSize: [0.38, 0.2, 0.34],
     verticalAnchor: 'ground',
@@ -180,7 +186,7 @@ const OFFICE_ASSET_PLACEMENTS: readonly OfficeAssetPlacement[] = [
     key: 'books',
     targetId: 'books',
     objectName: 'ANOM_Office_Books',
-    position: [0.1, 0.83, -0.4],
+    position: [0.3, 0.94, -0.2],
     rotationY: -0.16,
     maximumSize: [0.42, 0.25, 0.32],
     verticalAnchor: 'ground',
@@ -197,12 +203,12 @@ const OFFICE_ASSET_PLACEMENTS: readonly OfficeAssetPlacement[] = [
     key: 'frameSmall',
     targetId: 'desk-photo',
     objectName: 'ANOM_Office_DeskPhoto',
-    position: [-0.92, 0.83, -0.42],
+    position: [0.12, 0.97, -0.17],
     rotationY: Math.PI,
     maximumSize: [0.28, 0.34, 0.18],
     verticalAnchor: 'ground',
-    interactionSize: [0.4, 0.46, 0.3],
-    interactionPosition: [0, 0.17, 0],
+    interactionSize: [0.46, 0.58, 0.3],
+    interactionPosition: [0, 0.19, 0.12],
     tint: '#bda988',
     anomalyColors: [
       { id: 'photo-blue', color: '#58768a' },
@@ -232,6 +238,7 @@ const OFFICE_ASSET_PLACEMENTS: readonly OfficeAssetPlacement[] = [
     targetId: 'drawer-cabinet',
     objectName: 'ANOM_Office_DrawerCabinet',
     position: [3.48, 0, -0.72],
+    quaternion: [0, -1, 0, 0],
     rotationY: Math.PI / 2,
     maximumSize: [0.68, 1.04, 0.72],
     verticalAnchor: 'ground',
@@ -266,7 +273,7 @@ const OFFICE_ASSET_PLACEMENTS: readonly OfficeAssetPlacement[] = [
     key: 'radio',
     targetId: 'radio',
     objectName: 'ANOM_Office_Radio',
-    position: [-3.58, 1.08, -1.68],
+    position: [-3.58, 0.9, -1.68],
     rotationY: Math.PI / 2,
     maximumSize: [0.28, 0.3, 0.5],
     verticalAnchor: 'ground',
@@ -283,7 +290,7 @@ const OFFICE_ASSET_PLACEMENTS: readonly OfficeAssetPlacement[] = [
     key: 'speaker',
     targetId: 'speaker',
     objectName: 'ANOM_Office_Speaker',
-    position: [-3.58, 1.08, -0.93],
+    position: [-3.58, 0.9, -1.15],
     rotationY: Math.PI / 2,
     maximumSize: [0.24, 0.32, 0.26],
     verticalAnchor: 'ground',
@@ -300,7 +307,8 @@ const OFFICE_ASSET_PLACEMENTS: readonly OfficeAssetPlacement[] = [
     key: 'armchair',
     targetId: 'bay-armchair',
     objectName: 'ANOM_Office_BayArmchair',
-    position: [0.2, 0, -4.05],
+    position: [0.2, 0, 1.45],
+    quaternion: [0, 1, 0, 0],
     rotationY: 0,
     maximumSize: [1.02, 1.05, 1.02],
     verticalAnchor: 'ground',
@@ -318,7 +326,7 @@ const OFFICE_ASSET_PLACEMENTS: readonly OfficeAssetPlacement[] = [
     key: 'rug',
     targetId: 'bay-rug',
     objectName: 'ANOM_Office_BayRug',
-    position: [0, 0.012, -3.76],
+    position: [0, 0.012, -2.55],
     rotationY: 0,
     maximumSize: [2.5, 0.05, 1.75],
     verticalAnchor: 'ground',
@@ -386,6 +394,8 @@ const OFFICE_ASSET_PLACEMENTS: readonly OfficeAssetPlacement[] = [
     targetId: 'wall-clock',
     objectName: 'ANOM_Office_WallClock',
     position: [-4.08, 1.86, -0.52],
+    quaternion: [0, -Math.SQRT1_2, 0, Math.SQRT1_2],
+    scale: [4.2, 4.2, 4.2],
     rotationY: Math.PI / 2,
     maximumSize: [0.16, 0.64, 0.64],
     verticalAnchor: 'center',
@@ -401,7 +411,7 @@ const OFFICE_ASSET_PLACEMENTS: readonly OfficeAssetPlacement[] = [
     key: 'parcel',
     targetId: 'archive-box',
     objectName: 'ANOM_Office_ArchiveBox',
-    position: [2.75, 0, 2.58],
+    position: [3.55, 0, 2.8],
     rotationY: -0.16,
     maximumSize: [0.62, 0.52, 0.62],
     verticalAnchor: 'ground',
@@ -633,8 +643,10 @@ export class GreyboxOffice extends RoomRuntime implements PlayableRoom {
         validationRegistry.register(target);
       }
 
+      const layoutAdditions = this.createLayoutAdditions(preparedTargets);
       this.getVisualRoot().add(
         ...preparedTargets.map((target) => target.object),
+        ...layoutAdditions,
       );
 
       for (const target of preparedTargets) {
@@ -701,6 +713,53 @@ export class GreyboxOffice extends RoomRuntime implements PlayableRoom {
     return object;
   }
 
+  private createLayoutAdditions(
+    targets: readonly AnomalyTarget[],
+  ): readonly THREE.Object3D[] {
+    const source = targets.find(({ id }) => id === 'bay-plant')?.object;
+
+    if (source === undefined) {
+      throw new Error('Office layout addition source "bay-plant" is missing.');
+    }
+
+    const copy = source.clone(true);
+    copy.name = 'ANOM_Office_BayPlant_Copy';
+    copy.position.set(1.5, 0, -4.05);
+    copy.quaternion.identity();
+    copy.scale.set(1, 1, 1);
+    const technicalObjects: THREE.Object3D[] = [];
+
+    copy.traverse((object) => {
+      if (
+        object.name.startsWith('INTERACT_') ||
+        (
+          object.layers.isEnabled(RENDER_LAYERS.interaction) &&
+          !object.layers.isEnabled(RENDER_LAYERS.scene)
+        )
+      ) {
+        technicalObjects.push(object);
+      }
+    });
+
+    for (const object of technicalObjects) {
+      object.removeFromParent();
+    }
+
+    copy.traverse((object) => {
+      const mesh = object as THREE.Mesh;
+
+      if (!mesh.isMesh) {
+        return;
+      }
+
+      mesh.material = Array.isArray(mesh.material)
+        ? mesh.material.map((material) => this.ownMaterial(material.clone()))
+        : this.ownMaterial(mesh.material.clone());
+    });
+
+    return [copy];
+  }
+
   private harmonizeImportedMaterials(
     root: THREE.Object3D,
     placement: OfficeAssetPlacement,
@@ -763,6 +822,11 @@ export class GreyboxOffice extends RoomRuntime implements PlayableRoom {
     interactionVolume.layers.set(RENDER_LAYERS.interaction);
     interactionVolume.renderOrder = 11;
     object.add(interactionVolume);
+
+    if (placement.targetId === 'wall-clock') {
+      this.addStoryClockDisplay(object);
+    }
+
     const surfaceNames: string[] = [];
 
     object.traverse((candidate) => {
@@ -795,57 +859,95 @@ export class GreyboxOffice extends RoomRuntime implements PlayableRoom {
     };
   }
 
+  private addStoryClockDisplay(clock: THREE.Group): void {
+    const display = new THREE.Group();
+    display.name = STORY_LOOP_ANCHOR.officeClockObjectName;
+    display.position.set(0, 0, -0.022);
+    display.rotation.y = Math.PI;
+    display.scale.set(
+      1 / clock.scale.x,
+      1 / clock.scale.y,
+      1 / clock.scale.z,
+    );
+    const material = this.ownMaterial(
+      new THREE.MeshBasicMaterial({
+        color: '#7f2524',
+        transparent: true,
+        opacity: 0.86,
+        depthWrite: false,
+      }),
+    );
+    material.name = 'STORY_OfficeClock_Digits';
+    const horizontal = this.ownGeometry(
+      new THREE.PlaneGeometry(0.042, 0.007),
+    );
+    const vertical = this.ownGeometry(
+      new THREE.PlaneGeometry(0.007, 0.038),
+    );
+    const segmentOffsets = {
+      a: [0, 0.043],
+      b: [0.022, 0.022],
+      c: [0.022, -0.022],
+      d: [0, -0.043],
+      e: [-0.022, -0.022],
+      f: [-0.022, 0.022],
+      g: [0, 0],
+    } as const;
+    const digitSegments = {
+      '0': ['a', 'b', 'c', 'd', 'e', 'f'],
+      '3': ['a', 'b', 'c', 'd', 'g'],
+      '4': ['b', 'c', 'f', 'g'],
+    } as const;
+    const digitXs = [-0.12, -0.055, 0.055, 0.12] as const;
+
+    for (const [digitIndex, digit] of STORY_LOOP_ANCHOR.clockDigits.entries()) {
+      for (const segmentId of digitSegments[digit]) {
+        const [x, y] = segmentOffsets[segmentId];
+        const segment = new THREE.Mesh(
+          segmentId === 'b' ||
+          segmentId === 'c' ||
+          segmentId === 'e' ||
+          segmentId === 'f'
+            ? vertical
+            : horizontal,
+          material,
+        );
+        segment.name = `STORY_OfficeClock_Digit${digitIndex}_${segmentId}`;
+        segment.position.set((digitXs[digitIndex] ?? 0) + x, y, 0);
+        segment.layers.set(RENDER_LAYERS.scene);
+        display.add(segment);
+      }
+    }
+
+    const colonGeometry = this.ownGeometry(
+      new THREE.CircleGeometry(0.005, 8),
+    );
+
+    for (const y of [-0.018, 0.018]) {
+      const dot = new THREE.Mesh(colonGeometry, material);
+      dot.name = `STORY_OfficeClock_Colon_${String(y)}`;
+      dot.position.set(0, y, 0);
+      dot.layers.set(RENDER_LAYERS.scene);
+      display.add(dot);
+    }
+
+    clock.add(display);
+  }
+
   private createAnomalyVariants(
     placement: OfficeAssetPlacement,
     surfaceNames: readonly string[],
   ): readonly PreparedAnomalyVariant[] {
-    const rotations: PreparedAnomalyVariant[] = [];
-
-    if (placement.rotations === 'floor') {
-      rotations.push(
-        {
-          id: 'turned-left',
-          kind: 'rotate',
-          rotationOffsetRadians: [0, FLOOR_ROTATION_ANOMALY_RADIANS, 0],
-        },
-        {
-          id: 'turned-right',
-          kind: 'rotate',
-          rotationOffsetRadians: [0, -FLOOR_ROTATION_ANOMALY_RADIANS, 0],
-        },
-      );
-    } else if (placement.rotations === 'wall-x') {
-      rotations.push(
-        {
-          id: 'tilted-left',
-          kind: 'rotate',
-          rotationOffsetRadians: [WALL_ROTATION_ANOMALY_RADIANS, 0, 0],
-        },
-        {
-          id: 'tilted-right',
-          kind: 'rotate',
-          rotationOffsetRadians: [-WALL_ROTATION_ANOMALY_RADIANS, 0, 0],
-        },
-      );
-    } else if (placement.rotations === 'wall-z') {
-      rotations.push(
-        {
-          id: 'tilted-left',
-          kind: 'rotate',
-          rotationOffsetRadians: [0, 0, WALL_ROTATION_ANOMALY_RADIANS],
-        },
-        {
-          id: 'tilted-right',
-          kind: 'rotate',
-          rotationOffsetRadians: [0, 0, -WALL_ROTATION_ANOMALY_RADIANS],
-        },
-      );
-    }
+    const visibilityVariants: PreparedAnomalyVariant[] =
+      placement.targetId === 'desk-photo'
+        ? [{ id: 'appeared', kind: 'show' }]
+        : [
+            { id: 'hidden', kind: 'hide' },
+            { id: 'appeared', kind: 'show' },
+          ];
 
     return [
-      { id: 'hidden', kind: 'hide' },
-      { id: 'appeared', kind: 'show' },
-      ...rotations,
+      ...visibilityVariants,
       ...placement.anomalyColors.map(({ id, color }) => ({
         id,
         kind: 'color' as const,
@@ -893,9 +995,16 @@ export class GreyboxOffice extends RoomRuntime implements PlayableRoom {
     window.opacity = 0.72;
     window.emissive.set('#17393e');
     window.emissiveIntensity = 0.36;
+    const wall = standard('#8a8276', 0.96);
+    wall.map = this.ownTexture(
+      createAgedPlasterTexture({
+        name: 'TEXTURE_Office_AgedPlaster',
+        seed: 3_047,
+      }),
+    );
 
     return {
-      wall: standard('#8a8276', 0.96),
+      wall,
       panel: standard('#4f5a57', 0.88),
       floor,
       ceiling,
@@ -935,40 +1044,15 @@ export class GreyboxOffice extends RoomRuntime implements PlayableRoom {
   }
 
   private createFloorTexture(): THREE.DataTexture {
-    const width = 48;
-    const height = 24;
-    const data = new Uint8Array(width * height * 4);
-    const woodA = new THREE.Color('#92785d');
-    const woodB = new THREE.Color('#7c654f');
-    const seam = new THREE.Color('#514137');
-
-    for (let y = 0; y < height; y += 1) {
-      for (let x = 0; x < width; x += 1) {
-        const color =
-          y === 0 || x % 16 === 0
-            ? seam
-            : (y + Math.floor(x / 16)) % 2 === 0
-              ? woodA
-              : woodB;
-        const offset = (y * width + x) * 4;
-        data[offset] = Math.round(color.r * 255);
-        data[offset + 1] = Math.round(color.g * 255);
-        data[offset + 2] = Math.round(color.b * 255);
-        data[offset + 3] = 255;
-      }
-    }
-
-    const texture = this.ownTexture(
-      new THREE.DataTexture(data, width, height, THREE.RGBAFormat),
+    return this.ownTexture(
+      createWoodPlankFloorTexture({
+        name: 'TEXTURE_Office_WornWood',
+        seed: 3_047,
+        repeat: [2.5, 3.5],
+        plankColors: ['#92785d', '#876d55', '#7c654f', '#9b8062'],
+        seamColor: '#514137',
+      }),
     );
-    texture.wrapS = THREE.RepeatWrapping;
-    texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(8, 8);
-    texture.magFilter = THREE.NearestFilter;
-    texture.minFilter = THREE.LinearMipmapLinearFilter;
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.needsUpdate = true;
-    return texture;
   }
 
   private createArchitecture(): void {
@@ -1333,13 +1417,13 @@ export class GreyboxOffice extends RoomRuntime implements PlayableRoom {
   }
 
   private createLighting(): void {
-    const hemisphere = new THREE.HemisphereLight('#d9e0dd', '#5c4d42', 1.05);
+    const hemisphere = new THREE.HemisphereLight('#94a1a5', '#3b2d26', 0.4);
     hemisphere.name = 'LIGHT_Office_Ambient';
-    const ambient = new THREE.AmbientLight('#b7a995', 0.4);
+    const ambient = new THREE.AmbientLight('#c8c0b3', 0.12);
     ambient.name = 'LIGHT_Office_Bounce';
     const key = new THREE.SpotLight(
       '#ffd09a',
-      2.35,
+      6.4,
       9,
       Math.PI / 3.2,
       0.5,
@@ -1355,16 +1439,16 @@ export class GreyboxOffice extends RoomRuntime implements PlayableRoom {
     key.shadow.bias = -0.0002;
     key.shadow.normalBias = 0.026;
     key.shadow.radius = 2;
-    const archiveFill = new THREE.PointLight('#e5bd8f', 0.8, 5.5, 1.6);
+    const archiveFill = new THREE.PointLight('#e5bd8f', 0.42, 5.5, 1.6);
     archiveFill.name = 'LIGHT_Office_ArchiveFill';
     archiveFill.position.set(3.1, 1.95, -1.5);
-    const libraryFill = new THREE.PointLight('#efc88f', 0.68, 5, 1.7);
+    const libraryFill = new THREE.PointLight('#efc88f', 0.38, 5, 1.7);
     libraryFill.name = 'LIGHT_Office_LibraryFill';
     libraryFill.position.set(-3.1, 1.85, -0.9);
-    const bayFill = new THREE.PointLight('#9dc8c7', 1.05, 5.8, 1.5);
+    const bayFill = new THREE.PointLight('#8faaa9', 0.45, 5.8, 1.5);
     bayFill.name = 'LIGHT_Office_BayFill';
     bayFill.position.set(0, 2.05, -4.25);
-    const entranceFill = new THREE.PointLight('#ffd099', 0.6, 4.2, 1.8);
+    const entranceFill = new THREE.PointLight('#ffd099', 0.36, 4.2, 1.8);
     entranceFill.name = 'LIGHT_Office_EntranceFill';
     entranceFill.position.set(-2.6, 1.8, 2.45);
     this.getVisualRoot().add(
@@ -1485,8 +1569,8 @@ export class GreyboxOffice extends RoomRuntime implements PlayableRoom {
     );
     this.addCollisionBox(
       'COLLIDER_OfficeDesk',
-      [2.25, 0.82, 0.9],
-      [0.25, 0.41, -0.35],
+      [1.45, 0.943, 0.68],
+      [0.25, 0.4715, -0.35],
     );
     this.addCollisionBox(
       'COLLIDER_OfficeFilingCabinet',
@@ -1506,7 +1590,7 @@ export class GreyboxOffice extends RoomRuntime implements PlayableRoom {
     this.addCollisionBox(
       'COLLIDER_OfficeBayArmchair',
       [1.02, 1.05, 1.02],
-      [0.2, 0.525, -4.05],
+      [0.2, 0.525, 1.45],
     );
   }
 

@@ -99,6 +99,7 @@ describe('HousePressureView', () => {
     const time = getElement(document, 'house-pressure-overlay__time');
 
     expect(vignette.style.opacity).toBe('0');
+    expect(time.textContent).toBe('03:04');
     expect(time.style.opacity).toBe('0');
 
     view.apply(FAILURE_SNAPSHOT);

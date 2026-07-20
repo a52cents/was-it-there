@@ -2,6 +2,7 @@ import type {
   HousePressureLevel,
   HousePressureSnapshot,
 } from '../gameplay/story/HousePressureSystem';
+import { STORY_LOOP_ANCHOR } from '../content/story/StoryLoopAnchor';
 
 const PRESSURE_MESSAGES: Readonly<
   Partial<Record<HousePressureLevel, string>>
@@ -37,7 +38,7 @@ export class HousePressureView {
     this.failureMessage.textContent = 'IT REMEMBERS YOU';
     this.failureTime = document.createElement('p');
     this.failureTime.className = 'house-pressure-overlay__time';
-    this.failureTime.textContent = '03:17';
+    this.failureTime.textContent = STORY_LOOP_ANCHOR.displayTime;
     failure.append(this.failureMessage, this.failureTime);
 
     this.announcement = document.createElement('div');

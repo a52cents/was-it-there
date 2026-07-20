@@ -5,6 +5,7 @@ import type {
   PlannedAnomaly,
 } from '../../src/gameplay/anomalies/AnomalyGenerator';
 import { RoomAnomalySystem } from '../../src/gameplay/anomalies/RoomAnomalySystem';
+import { AnomalyTargetRegistry } from '../../src/gameplay/anomalies/AnomalyTargetRegistry';
 import type {
   AnomalyTarget,
   PreparedAnomalyVariant,
@@ -226,12 +227,38 @@ describe('RoomAnomalySystem', () => {
 
   it('seeds tilted baseline objects and can restore their canonical orientation', () => {
     const canonicalState = serializeRoom(room.getAnomalyTargets());
+    const sourceTarget = room.getAnomalyTargets()[0];
+
+    if (sourceTarget === undefined) {
+      throw new Error('Expected a source target for rotation coverage.');
+    }
+
+    const rotationRegistry = new AnomalyTargetRegistry();
+    rotationRegistry.register({
+      ...sourceTarget,
+      id: 'corridor-style-rotatable-target',
+      allowedKinds: ['hide', 'show', 'color', 'rotate'],
+      variants: [
+        ...sourceTarget.variants,
+        {
+          id: 'turned-left',
+          kind: 'rotate',
+          rotationOffsetRadians: [0, Math.PI / 6, 0],
+        },
+        {
+          id: 'turned-right',
+          kind: 'rotate',
+          rotationOffsetRadians: [0, -Math.PI / 6, 0],
+        },
+      ],
+    });
+    const rotationSystem = new RoomAnomalySystem(rotationRegistry);
     const rotationCounts = new Set<number>();
     let restorationPlan: AnomalyPlan | null = null;
     let restoredTarget: AnomalyTarget | null = null;
 
     for (let seed = 0; seed < 5_000; seed += 1) {
-      const baseline = system.prepareRunBaseline({
+      const baseline = rotationSystem.prepareRunBaseline({
         runSeed: seed,
         roomIndex: 0,
         roomId: room.definition.id,
@@ -240,7 +267,7 @@ describe('RoomAnomalySystem', () => {
       expect(baseline.rotationChanges.length).toBeLessThanOrEqual(2);
 
       for (const { targetId } of baseline.rotationChanges) {
-        const target = room.getAnomalyTargetRegistry().getById(targetId);
+        const target = rotationRegistry.getById(targetId);
         const initialRoot = target?.initialState.nodes.find(
           (snapshot) => snapshot.node === target.object,
         );
@@ -254,7 +281,7 @@ describe('RoomAnomalySystem', () => {
         continue;
       }
 
-      const plan = system.generatePlan({
+      const plan = rotationSystem.generatePlan({
         runSeed: seed,
         roomIndex: 0,
         roomId: room.definition.id,
@@ -268,9 +295,7 @@ describe('RoomAnomalySystem', () => {
 
       if (restoration !== undefined) {
         restorationPlan = plan;
-        restoredTarget = room
-          .getAnomalyTargetRegistry()
-          .getById(restoration.targetId);
+        restoredTarget = rotationRegistry.getById(restoration.targetId);
         break;
       }
     }
@@ -289,12 +314,12 @@ describe('RoomAnomalySystem', () => {
     const initialRoot = restoredTarget.initialState.nodes.find(
       (snapshot) => snapshot.node === restoredTarget?.object,
     );
-    system.applyPlan(restorationPlan);
+    rotationSystem.applyPlan(restorationPlan);
     expect(restoredTarget.object.quaternion.angleTo(
       new THREE.Quaternion().fromArray(initialRoot?.quaternion ?? [0, 0, 0, 1]),
     )).toBeLessThan(0.000_001);
 
-    system.restore();
+    rotationSystem.restore();
     expect(serializeRoom(room.getAnomalyTargets())).toEqual(canonicalState);
   });
 
@@ -345,6 +370,57 @@ describe('RoomAnomalySystem', () => {
         requiredVisibleTargetIds: ['missing-story-prop'],
       }),
     ).toThrow('is not registered');
+  });
+
+  it('removes hide anomalies from protected Story clues only', () => {
+    const protectedTargetIds = room
+      .getAnomalyTargets()
+      .slice(0, 2)
+      .map(({ id }) => id);
+    expect(protectedTargetIds).toHaveLength(2);
+    let selectedProtectedClue = false;
+    let generatedUnprotectedDisappearance = false;
+
+    for (let seed = 0; seed < 300; seed += 1) {
+      const baseline = system.prepareRunBaseline({
+        runSeed: seed,
+        roomIndex: 0,
+        roomId: room.definition.id,
+        requiredVisibleTargetIds: room
+          .getAnomalyTargets()
+          .map(({ id }) => id),
+        disappearanceProtectedTargetIds: protectedTargetIds,
+      });
+      expect(baseline.hiddenTargetIds).toEqual([]);
+
+      const plan = system.generatePlan({
+        runSeed: seed,
+        roomIndex: 0,
+        roomId: room.definition.id,
+        difficulty: 1,
+        count: 3,
+      });
+
+      for (const anomaly of plan.anomalies) {
+        if (protectedTargetIds.includes(anomaly.targetId)) {
+          selectedProtectedClue = true;
+          expect(anomaly.kind).toBe('color');
+        } else {
+          generatedUnprotectedDisappearance ||= anomaly.kind === 'hide';
+        }
+      }
+    }
+
+    expect(selectedProtectedClue).toBe(true);
+    expect(generatedUnprotectedDisappearance).toBe(true);
+    expect(() =>
+      system.prepareRunBaseline({
+        runSeed: 1,
+        roomIndex: 0,
+        roomId: room.definition.id,
+        disappearanceProtectedTargetIds: ['missing-story-clue'],
+      }),
+    ).toThrow('Disappearance-protected Story target');
   });
 
   it('keeps a hidden target interaction volume available', () => {

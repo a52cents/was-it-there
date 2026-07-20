@@ -160,9 +160,10 @@ describe('Level Builder document', () => {
     const document = session.createLayoutDocument();
 
     expect(document).toMatchObject({
-      formatVersion: 1,
+      formatVersion: 2,
       documentType: 'room-layout',
       roomId: 'bathroom',
+      additions: [],
     });
     expect(document.objects.map((object) => object.targetId)).toEqual([
       'a-chair',
@@ -180,6 +181,34 @@ describe('Level Builder document', () => {
     expect(JSON.parse(serializeLevelBuilderLayoutDocument(document))).toEqual(
       document,
     );
+  });
+
+  it('exports duplicated furniture and removes additions cleanly', () => {
+    const { root, secondChair } = createSceneGraph();
+    const session = new LevelBuilderSession(
+      'office',
+      root,
+      (object) => (object === secondChair ? 'desk-chair' : undefined),
+    );
+    const addition = secondChair.clone(true);
+    addition.name = 'Chair_Copy';
+    addition.position.set(1.5, 0, -2);
+    root.add(addition);
+    session.registerAddition(addition, secondChair);
+
+    const [exportedAddition] = session.createLayoutDocument().additions;
+    expect(exportedAddition?.id).toBe('added-chair-1');
+    expect(exportedAddition?.nodeName).toBe('Chair_Copy');
+    expect(exportedAddition?.position).toEqual([1.5, 0, -2]);
+    expect(exportedAddition?.source.anomalyTargetId).toBe('desk-chair');
+    session.select(addition);
+    expect(session.saveVariant('copy-moved', 'move')).toEqual({
+      valid: false,
+      errors: ['Added layout objects cannot define anomaly variants.'],
+    });
+    expect(session.removeAddition(addition)).toBe(true);
+    expect(addition.parent).toBeNull();
+    expect(session.createLayoutDocument().additions).toEqual([]);
   });
 });
 

@@ -30,4 +30,17 @@ describe('ExitThresholdDetector', () => {
         }),
     ).toThrow(RangeError);
   });
+
+  it('supports a north-facing exit with horizontal doorway bounds', () => {
+    const northExit = new ExitThresholdDetector({
+      z: -4.6,
+      minimumX: 2.2,
+      maximumX: 3.3,
+      crossing: 'negative-z',
+    });
+
+    expect(northExit.hasCrossed({ x: 2.75, z: -4.59 })).toBe(false);
+    expect(northExit.hasCrossed({ x: 2.75, z: -4.6 })).toBe(true);
+    expect(northExit.hasCrossed({ x: 2.19, z: -5 })).toBe(false);
+  });
 });

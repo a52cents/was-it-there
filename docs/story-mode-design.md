@@ -2,8 +2,8 @@
 
 ## Story Mode Design Bible — Version 0.1
 
-**Status:** approved direction, Lot 8 corridor content implemented  
-**Scope:** first complete story slice across the four built rooms  
+**Status:** approved direction, kitchen epilogue implemented
+**Scope:** first complete story slice across the first five built rooms
 **Modes:** `STORY` and `ESCAPE` remain separate  
 **Default game language:** English, with content structured for later localization
 
@@ -20,10 +20,10 @@ The additional systems give those actions a narrative meaning:
 - the house rebuilds its memories incorrectly;
 - the player uses observation to resist those false memories;
 - mistakes increase the house's control over the current room;
-- failure restarts the night at 03:17;
+- failure restarts the night at 03:04;
 - knowledge survives even when the physical house resets.
 
-The first story slice ends after the office. It must feel like a complete first
+The first story slice ends after the kitchen. It must feel like a complete first
 chapter while leaving the final resolution for the future ten-room route.
 
 ---
@@ -75,7 +75,7 @@ Menu promise:
 
 Story Mode includes:
 
-- the 03:17 loop;
+- the 03:04 loop;
 - deterministic narrative events;
 - interactive story objects;
 - persistent discoveries and fragments;
@@ -109,7 +109,7 @@ Escape timing, anomaly selection, scoring, or room restoration.
 ## 4. Premise
 
 Every night, the house attempts to reconstruct the people who once lived
-inside it. The reconstruction begins at 03:17, but parts of each memory are
+inside it. The reconstruction begins at 03:04, but parts of each memory are
 wrong.
 
 The player wakes in the bedroom without being told whether they are a former
@@ -133,20 +133,22 @@ stating them directly.
 
 One loop follows this sequence:
 
-1. The screen displays `03:17`.
+1. The screen displays `03:04`.
 2. The player wakes in the bedroom.
 3. Previously discovered notebook entries remain available.
-4. Each room follows observation, blackout, search, and completion.
+4. Each room follows observation, blackout, anomaly search, then its Story
+   objective during completion.
 5. Scripted events occur at stable points in the room timeline.
 6. During full black, the player returns to the room entry position.
 7. Search therefore begins from a stable, fair reference point.
 8. Correct and incorrect reports make the house react.
-9. Crossing the office exit completes the first chapter.
-10. A third error triggers a room-specific failure sequence.
-11. The physical route resets to the bedroom.
-12. The loop counter and narrative discoveries persist.
+9. The office revelation leads into the kitchen epilogue.
+10. Crossing the kitchen exit completes the first chapter.
+11. A third error triggers a room-specific failure sequence.
+12. The physical route resets to the bedroom.
+13. The loop counter and narrative discoveries persist.
 
-For the four-room slice, a complete successful loop should remain short enough
+For the five-room slice, a complete successful loop should remain short enough
 that restarting from the bedroom is meaningful rather than exhausting.
 
 When the route grows to ten rooms, the restart cost must be playtested again.
@@ -157,7 +159,7 @@ checkpoints are not part of the first implementation.
 
 ## 6. Time rules
 
-`03:17` is a diegetic anchor, not the device's wall-clock time.
+`03:04` is a diegetic anchor, not the device's wall-clock time.
 
 Story events use monotonic gameplay time and obey these rules:
 
@@ -181,6 +183,10 @@ This contract has priority over atmosphere.
 
 ### During observation
 
+A neutral reticle remains visible for orientation, but no object can be
+examined, answered, activated, or otherwise interacted with. Observation is
+reserved for movement and memorizing the room.
+
 A narrative event may animate or add an element if it returns to a stable state
 before the anomaly baseline is finalized. Audio-only reactions may continue as
 long as every meaningful clue also has a visual subtitle or indicator.
@@ -203,12 +209,16 @@ change ambience, overlays, or non-reportable helper objects.
 ### During search
 
 A story event must never move, recolor, hide, reveal, rotate, or rescale a
-reportable target. Story interactions are disabled while reporting is active.
+reportable target. Story interactions remain disabled until every anomaly has
+been reported.
 
 ### After room completion
 
-The room may perform stronger narrative transformations because reporting has
-ended. These effects must still be restored before the room is reused.
+Story interactions unlock only now. A room with a required Story objective
+keeps its exit locked until that interaction is completed; a room without one
+opens normally. The room may perform stronger narrative transformations
+because reporting has ended. These effects must still be restored before the
+room is reused.
 
 ### Interaction feedback
 
@@ -376,7 +386,7 @@ House pressure mirrors the existing three-error limit.
 
 - input stops;
 - a room-specific failure sequence plays for at most four seconds;
-- the screen resolves to `03:17`;
+- the screen resolves to `03:04`;
 - the next loop begins from the bedroom.
 
 Timeout and incorrect-report errors share the same pressure scale but may use
@@ -394,8 +404,9 @@ calm the presentation so the player receives satisfying physical feedback.
 
 ## 12. Interaction rules
 
-Story interactions are available only in Story Mode and outside the search
-phase.
+Story interactions are available only in Story Mode after every anomaly in the
+room has been found. This is a global rule for existing and future rooms:
+observation and anomaly search never accept Story interaction input.
 
 For the first slice, interactions are fixed to the room. The player does not
 carry a general-purpose inventory.
@@ -413,7 +424,7 @@ The same physical prop may still be an anomaly target. Story interaction must
 not change its anomaly snapshot, and search mode always gives reporting
 priority.
 
-A single carried `memory object` may be explored after the four-room slice is
+A single carried `memory object` may be explored after the five-room slice is
 validated. It is not required for the first chapter implementation.
 
 ---
@@ -424,16 +435,17 @@ validated. It is not required for the first chapter implementation.
 
 Purpose:
 
-- introduce 03:17;
+- introduce 03:04;
 - establish the radio and family photo as story objects;
 - teach that story interactions are separate from reports.
 
 Authored beats:
 
-1. Loop opening displays `03:17`.
+1. Loop opening displays `03:04`.
 2. A short radio burst begins during observation.
-3. Examining the photo reveals that its composition leaves an unnatural gap.
-4. The first successful room completion lets the radio finish its message.
+3. After the anomaly search, the room objective asks for the family photo.
+4. Examining it reveals that its composition leaves an unnatural gap and lets
+   the radio finish its message.
 5. In Story, the exit remains locked until the family photo has been examined
    during the current loop.
 
@@ -451,13 +463,15 @@ Failure presentation:
 
 - the radio searches rapidly through empty frequencies;
 - practical lights extinguish toward the player;
-- the final radio click cuts to 03:17.
+- the final radio click cuts to 03:04.
 
 No new external asset is required. A simple non-reportable clock display may be
 created from existing UI or primitive geometry if the physical room needs it.
 Like every reportable Story prop, the low bookcase, radio, and family photo are
-all present during observation. They remain eligible for a disappearance
-anomaly after blackout.
+all present during observation. The radio and family photo cannot receive a
+disappearance anomaly in Story, so their narrative clues remain readable after
+the blackout; their color anomalies remain available. Escape keeps the full
+anomaly catalogue.
 
 ### 13.2 Bathroom — The warning
 
@@ -468,15 +482,16 @@ Purpose:
 
 Authored beats:
 
-1. The Story objective reads `EXAMINE THE ROOM` during observation.
-2. The mirror is the required examination; fingerprints appear to sit behind
-   its glass without mechanically changing the anomaly target.
+1. Observation displays `MEMORIZE THE ROOM` and accepts no interaction.
+2. Once every anomaly is found, the mirror becomes the required examination;
+   interacting with it displays its
+   warning as a subtitle without changing the mirror visually.
 3. The bathtub, vanity, toothbrush cup, rubber duck, candle, and folded towels
    expose optional strange descriptions and connected easter eggs.
 4. Water and pipe sounds build during observation.
 5. The mirror remains mechanically unchanged during search.
-6. After room completion, a separate fog overlay appears on the mirror.
-7. The overlay reveals a short warning, then fades before transition.
+6. No fog, writing, texture, or helper mesh appears on the mirror.
+7. The warning is delivered only when the player examines it.
 
 Provisional English copy:
 
@@ -491,17 +506,13 @@ Failure presentation:
 
 - condensation rapidly covers the view without a face or jumpscare;
 - water audio cuts to silence;
-- 03:17 appears through the fog.
+- 03:04 appears through the fog.
 
-The fog and writing are non-reportable helper meshes and must never modify the
-mirror target material captured by the anomaly system.
-
-Implementation note: the warning uses a dedicated mirror fog plane created
-outside the anomaly snapshot. It appears only after reporting is complete,
-fades after the subtitled warning, and is forcibly hidden by Story restoration.
-The third-error presentation adds a separate full-screen condensation effect.
-The exit stays locked until the mirror has been examined, while every optional
-bathroom examination remains available during observation and room completion.
+The mirror warning is subtitle-only and never modifies the anomaly target or
+adds a helper mesh. The separate third-error presentation can still use its
+full-screen condensation effect. The exit stays locked until the mirror has
+been examined, while every optional bathroom examination remains available
+only during room completion.
 
 ### 13.3 Corridor — The prediction
 
@@ -513,9 +524,10 @@ Purpose:
 
 Authored beats:
 
-1. The wall clock visibly establishes 03:17 as part of the normal baseline.
+1. The wall clock visibly establishes 03:04 as part of the normal baseline.
 2. The telephone rings during observation.
-3. Answering it plays a short, subtitled prediction.
+3. After the anomaly search, answering it optionally plays a short, subtitled
+   prediction; the corridor has no required Story objective.
 4. The predicted sound or phrase occurs later in the office.
 
 Provisional English copy:
@@ -530,7 +542,7 @@ Failure presentation:
 
 - every ring moves closer through spatial audio while the phone remains still;
 - the final ring comes from behind the player;
-- the screen cuts to 03:17 without showing a creature.
+- the screen cuts to 03:04 without showing a creature.
 
 The telephone and clock remain valid anomaly targets. Ringing them cannot
 change transform, visibility, color, scale, or anomaly material state.
@@ -538,7 +550,7 @@ change transform, visibility, color, scale, or anomaly material state.
 Implementation note: Story guarantees every corridor target, including the
 telephone and clock, is present in the observation baseline while leaving its
 post-blackout anomaly variants available. The clock carries a static
-non-interactive `03:17` display. Answering the optional call persists both its
+non-interactive `03:04` display. Answering the optional call persists both its
 memory fragment and a choice flag for the office payoff; ignoring it never
 blocks progression.
 
@@ -548,14 +560,15 @@ Purpose:
 
 - pay off the corridor prediction;
 - connect the missing family member to the player;
-- end the first slice with a meaningful chapter outcome.
+- reveal why the house erased the player before the kitchen confirms it.
 
 Authored beats:
 
 1. The office radio repeats the frequency pattern from the bedroom.
 2. If the corridor call was answered, the predicted silence occurs.
-3. Examining the desk photo or a non-reportable document reveals an erased name.
-4. Room completion resolves the chapter according to collected fragments.
+3. After the anomaly search, examining the required desk photo reveals an
+   erased name.
+4. Room completion opens the route into the kitchen.
 
 Provisional English copy:
 
@@ -570,11 +583,47 @@ Failure presentation:
 
 - the radio addresses the player with an incomplete or distorted name;
 - office lights isolate the desk photo;
-- the image darkens and resolves to 03:17.
+- the image darkens and resolves to 03:04.
 
 The first implementation should reuse the existing office radio, phone, clock,
 and photo bindings. A document may be represented by a lightweight
 non-reportable plane if necessary.
+
+### 13.5 Kitchen — Breakfast in reverse
+
+Purpose:
+
+- confirm the office revelation through an ordinary family ritual;
+- make the room feel predictive rather than simply haunted;
+- close the first slice with a distinct domestic memory.
+
+Authored beats:
+
+1. The microwave and toaster play the end of breakfast before anyone sits down.
+2. A chair is heard scraping while every visible object remains still.
+3. Appliances contain optional evidence dated tomorrow.
+4. After the anomaly search, counting the places reveals three served meals
+   and a fourth place removed before service.
+5. Room completion resolves the chapter according to collected fragments.
+
+The breakfast table cannot disappear in Story because it carries the required
+counting interaction. Its other anomaly types follow the kitchen catalogue.
+
+Provisional English copy:
+
+> They kept setting my place after the house removed me.
+
+Supporting fragment:
+
+`memory-kitchen-fourth-place` — The family continued preparing a place for the
+erased resident. This reinforces the four core memories without changing the
+first-chapter outcome requirement.
+
+Failure presentation:
+
+- every appliance answers at once;
+- the service ticket changes the fourth place from removed to accepted;
+- the house begins to “prepare” the player as the missing course.
 
 ---
 
@@ -582,14 +631,14 @@ non-reportable plane if necessary.
 
 ### First chapter outcomes
 
-The office exit currently ends the built route. Story Mode replaces the normal
+The kitchen exit currently ends the built Story route. Story Mode replaces the normal
 victory copy with one of two chapter outcomes:
 
 #### `CHAPTER ESCAPED`
 
 Condition:
 
-- office completed;
+- kitchen completed;
 - fewer than four core fragments discovered.
 
 Meaning:
@@ -600,7 +649,7 @@ The player escaped the reconstructed section but does not understand the loop.
 
 Condition:
 
-- office completed;
+- kitchen completed;
 - all four core fragments discovered.
 
 Meaning:
@@ -674,7 +723,7 @@ transition behavior must be explicit during the final error reaction.
 
 ## 17. First-slice exclusions
 
-Do not add during the four-room story slice:
+Do not add during the five-room story slice:
 
 - combat;
 - enemy or family character AI;
@@ -704,7 +753,7 @@ The first Story chapter is acceptable when:
 - all four core fragments can be discovered in one loop;
 - missing an optional interaction does not block room progression;
 - the third error produces a short reversible failure sequence;
-- a failed Story loop restarts in the bedroom at 03:17;
+- a failed Story loop restarts in the bedroom at 03:04;
 - notebook discoveries survive reload and loop reset;
 - anomaly generation remains deterministic;
 - every blackout returns the player to the active room spawn while fully dark;

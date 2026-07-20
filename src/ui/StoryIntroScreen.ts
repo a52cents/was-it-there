@@ -1,3 +1,5 @@
+import { STORY_LOOP_ANCHOR } from '../content/story/StoryLoopAnchor';
+
 export class StoryIntroScreen {
   private readonly element: HTMLElement;
   private readonly continueButton: HTMLButtonElement;
@@ -19,7 +21,7 @@ export class StoryIntroScreen {
 
     const title = document.createElement('h2');
     title.id = 'story-intro-title';
-    title.textContent = '03:17';
+    title.textContent = STORY_LOOP_ANCHOR.displayTime;
 
     const message = document.createElement('p');
     message.className = 'story-intro-screen__message';

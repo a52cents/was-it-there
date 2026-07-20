@@ -38,6 +38,10 @@ export class StandaloneAdapter implements PlatformAdapter {
     return Promise.resolve();
   }
 
+  public isRewardedAdAvailable(): boolean {
+    return false;
+  }
+
   public requestRewardedAd(): Promise<boolean> {
     return Promise.resolve(false);
   }

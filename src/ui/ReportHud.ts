@@ -84,6 +84,7 @@ export class ReportHud {
     }
 
     const searchActive = view.state === 'search';
+    const observationActive = view.state === 'observation';
     const feedbackActive = this.feedbackOutcome !== null;
     const showCompletionFeedback =
       view.state === 'room-complete' && feedbackActive;
@@ -99,7 +100,10 @@ export class ReportHud {
     this.errors.classList.toggle('has-errors', view.errorCount > 0);
 
     this.reticle.hidden =
-      !searchActive && !showCompletionFeedback && !storyInteractionActive;
+      !observationActive &&
+      !searchActive &&
+      !showCompletionFeedback &&
+      !storyInteractionActive;
     this.reticle.classList.toggle(
       'is-targeted',
       (searchActive && view.aimedAtTarget && !feedbackActive) ||

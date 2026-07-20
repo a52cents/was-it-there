@@ -17,6 +17,8 @@ import {
 } from '../assets/AssetManager';
 import type { RoomDefinition } from '../RoomDefinition';
 import { RoomRuntime } from '../RoomRuntime';
+import { createAgedPlasterTexture } from '../textures/AgedPlasterTexture';
+import { createStoneTileFloorTexture } from '../textures/ProceduralFloorTexture';
 import type { PlayableRoom } from './PlayableRoom';
 
 type Vector3Tuple = readonly [number, number, number];
@@ -88,7 +90,6 @@ const ENTRANCE_CENTER_X = -1.5;
 const ENTRANCE_WIDTH = 1;
 const EXIT_CENTER_Z = 1.55;
 const EXIT_WIDTH = 1;
-const ROTATION_ANOMALY_RADIANS = Math.PI / 6;
 
 const BATHROOM_ASSET_PLACEMENTS: readonly BathroomAssetPlacement[] = [
   {
@@ -408,7 +409,6 @@ export class GreyboxBathroom extends RoomRuntime implements PlayableRoom {
   private assetLoadPromise: Promise<void> | null = null;
   private assetsLoaded = false;
   private buildRevision = 0;
-  private storyMirrorFog: THREE.Mesh | null = null;
 
   public constructor() {
     super('ROOM_GreyboxBathroom_VisualRoot', 'COLLIDER_GreyboxBathroom_Root');
@@ -436,47 +436,6 @@ export class GreyboxBathroom extends RoomRuntime implements PlayableRoom {
 
   public getLoadedAssetIds(): readonly string[] {
     return this.assetLease === null ? [] : [this.assetLease.assetId];
-  }
-
-  public setStoryMirrorFogVisible(visible: boolean): boolean {
-    if (this.storyMirrorFog === null) {
-      if (!visible) {
-        return true;
-      }
-
-      const mirror = this.anomalyTargetRegistry.getById('mirror');
-
-      if (mirror === null) {
-        return false;
-      }
-
-      const material = this.ownMaterial(
-        new THREE.MeshBasicMaterial({
-          color: '#b8cbca',
-          transparent: true,
-          opacity: 0.74,
-          depthWrite: false,
-          side: THREE.DoubleSide,
-        }),
-      );
-      material.name = 'STORY_BathroomMirrorFog_Material';
-      this.storyMirrorFog = new THREE.Mesh(
-        this.ownGeometry(new THREE.PlaneGeometry(0.92, 0.76)),
-        material,
-      );
-      this.storyMirrorFog.name = 'STORY_BathroomMirrorFog';
-      this.storyMirrorFog.position.set(0, 0, 0.13);
-      this.storyMirrorFog.renderOrder = 9;
-      this.storyMirrorFog.layers.set(RENDER_LAYERS.scene);
-      mirror.object.add(this.storyMirrorFog);
-    }
-
-    this.storyMirrorFog.visible = visible;
-    return true;
-  }
-
-  public isStoryMirrorFogVisible(): boolean {
-    return this.storyMirrorFog?.visible === true;
   }
 
   public async loadAssets(assetManager?: AssetManager): Promise<void> {
@@ -579,7 +538,6 @@ export class GreyboxBathroom extends RoomRuntime implements PlayableRoom {
     this.exitDoorCollider = null;
     this.exitPortal = null;
     this.exitPortalLight = null;
-    this.storyMirrorFog = null;
   }
 
   private async performAssetLoad(
@@ -795,40 +753,9 @@ export class GreyboxBathroom extends RoomRuntime implements PlayableRoom {
     placement: BathroomAssetPlacement,
     surfaceNames: readonly string[],
   ): readonly PreparedAnomalyVariant[] {
-    const rotations: PreparedAnomalyVariant[] = [];
-
-    if (placement.rotations === 'floor') {
-      rotations.push(
-        {
-          id: 'turned-left',
-          kind: 'rotate',
-          rotationOffsetRadians: [0, ROTATION_ANOMALY_RADIANS, 0],
-        },
-        {
-          id: 'turned-right',
-          kind: 'rotate',
-          rotationOffsetRadians: [0, -ROTATION_ANOMALY_RADIANS, 0],
-        },
-      );
-    } else if (placement.rotations === 'wall') {
-      rotations.push(
-        {
-          id: 'tilted-left',
-          kind: 'rotate',
-          rotationOffsetRadians: [0, 0, ROTATION_ANOMALY_RADIANS],
-        },
-        {
-          id: 'tilted-right',
-          kind: 'rotate',
-          rotationOffsetRadians: [0, 0, -ROTATION_ANOMALY_RADIANS],
-        },
-      );
-    }
-
     return [
       { id: 'hidden', kind: 'hide' },
       { id: 'appeared', kind: 'show' },
-      ...rotations,
       ...placement.anomalyColors.map(({ id, color }) => ({
         id,
         kind: 'color' as const,
@@ -872,21 +799,32 @@ export class GreyboxBathroom extends RoomRuntime implements PlayableRoom {
       new THREE.Color('#aaa79e'),
       new THREE.Color('#969991'),
       new THREE.Color('#727a76'),
+      'TEXTURE_Bathroom_WornFloorTile',
+      3_041,
+      [2, 2.25],
     );
-    floorTexture.repeat.set(8, 9);
     const wallTileTexture = this.createTileTexture(
       new THREE.Color('#d0d3ca'),
       new THREE.Color('#bbc5c0'),
       new THREE.Color('#89938f'),
+      'TEXTURE_Bathroom_WallTile',
+      3_067,
+      [2.5, 0.75],
     );
-    wallTileTexture.repeat.set(10, 3);
     const floor = standard('#ffffff', 0.92);
     floor.map = floorTexture;
     const tile = standard('#ffffff', 0.88);
     tile.map = wallTileTexture;
+    const wall = standard('#687a7d', 0.96);
+    wall.map = this.ownTexture(
+      createAgedPlasterTexture({
+        name: 'TEXTURE_Bathroom_AgedPlaster',
+        seed: 3_041,
+      }),
+    );
 
     return {
-      wall: standard('#687a7d', 0.96),
+      wall,
       tile,
       floor,
       ceiling: standard('#c5c3b9', 0.98),
@@ -948,32 +886,19 @@ export class GreyboxBathroom extends RoomRuntime implements PlayableRoom {
     first: THREE.Color,
     second: THREE.Color,
     grout: THREE.Color,
+    name: string,
+    seed: number,
+    repeat: readonly [number, number],
   ): THREE.DataTexture {
-    const size = 16;
-    const data = new Uint8Array(size * size * 4);
-
-    for (let y = 0; y < size; y += 1) {
-      for (let x = 0; x < size; x += 1) {
-        const isGrout = x === 0 || y === 0;
-        const color = isGrout ? grout : (x + y) % 2 === 0 ? first : second;
-        const offset = (y * size + x) * 4;
-        data[offset] = Math.round(color.r * 255);
-        data[offset + 1] = Math.round(color.g * 255);
-        data[offset + 2] = Math.round(color.b * 255);
-        data[offset + 3] = 255;
-      }
-    }
-
-    const texture = this.ownTexture(
-      new THREE.DataTexture(data, size, size, THREE.RGBAFormat),
+    return this.ownTexture(
+      createStoneTileFloorTexture({
+        name,
+        seed,
+        repeat,
+        tileColors: [first, second],
+        groutColor: grout,
+      }),
     );
-    texture.wrapS = THREE.RepeatWrapping;
-    texture.wrapT = THREE.RepeatWrapping;
-    texture.magFilter = THREE.NearestFilter;
-    texture.minFilter = THREE.LinearMipmapLinearFilter;
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.needsUpdate = true;
-    return texture;
   }
 
   private createArchitecture(): void {
@@ -1395,15 +1320,15 @@ export class GreyboxBathroom extends RoomRuntime implements PlayableRoom {
   }
 
   private createLighting(): void {
-    const hemisphere = new THREE.HemisphereLight('#d7e4e6', '#756d62', 1.18);
+    const hemisphere = new THREE.HemisphereLight('#94a1a5', '#3b2d26', 0.4);
     hemisphere.name = 'LIGHT_Bathroom_Ambient';
-    const bounce = new THREE.AmbientLight('#dce2de', 0.68);
+    const bounce = new THREE.AmbientLight('#c8c0b3', 0.12);
     bounce.name = 'LIGHT_Bathroom_Bounce';
     const ceiling = new THREE.SpotLight(
       '#ffd09a',
-      8.2,
+      6.4,
       8,
-      Math.PI * 0.48,
+      Math.PI * 0.36,
       0.5,
       2,
     );
@@ -1417,17 +1342,17 @@ export class GreyboxBathroom extends RoomRuntime implements PlayableRoom {
     ceiling.shadow.bias = -0.00025;
     ceiling.shadow.normalBias = 0.025;
     ceiling.shadow.radius = 2;
-    const vanity = new THREE.PointLight('#ffca91', 1.25, 3.4, 1.7);
+    const vanity = new THREE.PointLight('#ffca91', 0.55, 3.4, 1.7);
     vanity.name = 'LIGHT_Bathroom_Vanity';
     vanity.position.set(0.45, 2.12, -2.45);
-    const windowFill = new THREE.DirectionalLight('#a8d1d7', 0.72);
+    const windowFill = new THREE.DirectionalLight('#829da6', 0.27);
     windowFill.name = 'LIGHT_Bathroom_WindowFill';
     windowFill.position.set(2.2, 2.2, 4.2);
     windowFill.target.position.set(-0.4, 0.5, -0.6);
-    const roomFill = new THREE.PointLight('#b9d0cf', 1.1, 5.8, 1.45);
+    const roomFill = new THREE.PointLight('#9fb6b5', 0.45, 5.8, 1.45);
     roomFill.name = 'LIGHT_Bathroom_RoomFill';
     roomFill.position.set(-0.35, 1.7, 1.55);
-    const tubFill = new THREE.PointLight('#ffd0a0', 0.62, 3.8, 1.6);
+    const tubFill = new THREE.PointLight('#ffd0a0', 0.32, 3.8, 1.6);
     tubFill.name = 'LIGHT_Bathroom_TubFill';
     tubFill.position.set(-2.05, 1.45, -0.55);
     this.getVisualRoot().add(

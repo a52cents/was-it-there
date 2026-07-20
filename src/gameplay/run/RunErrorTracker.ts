@@ -46,4 +46,14 @@ export class RunErrorTracker {
     this.errorCount = 0;
     this.lastError = null;
   }
+
+  public grantExtraLife(): RunErrorSnapshot {
+    if (this.errorCount < this.maximumErrors) {
+      throw new Error('An extra life can only be granted after game over.');
+    }
+
+    this.errorCount = this.maximumErrors - 1;
+    this.lastError = null;
+    return this.getSnapshot();
+  }
 }

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { CORRIDOR_ASSET_CATALOG } from '../../content/rooms/CorridorAssetCatalog';
+import { STORY_LOOP_ANCHOR } from '../../content/story/StoryLoopAnchor';
 import {
   captureAnomalyCollisionObjectState,
   captureAnomalyTargetInitialState,
@@ -14,6 +15,8 @@ import {
 } from '../assets/AssetManager';
 import type { RoomDefinition } from '../RoomDefinition';
 import { RoomRuntime } from '../RoomRuntime';
+import { createAgedPlasterTexture } from '../textures/AgedPlasterTexture';
+import { createWoodPlankFloorTexture } from '../textures/ProceduralFloorTexture';
 import type { PlayableRoom } from './PlayableRoom';
 
 type Vector3Tuple = readonly [number, number, number];
@@ -694,7 +697,7 @@ export class GreyboxCorridor extends RoomRuntime implements PlayableRoom {
     object.add(interactionVolume);
 
     if (placement.targetId === 'wall-lamp') {
-      const glow = new THREE.PointLight('#ffc982', 0.72, 2.5, 1.7);
+      const glow = new THREE.PointLight('#ffc982', 0.32, 2.5, 1.7);
       glow.name = 'LIGHT_Corridor_WallLampGlow';
       glow.position.set(0.18, -0.03, 0);
       object.add(glow);
@@ -795,7 +798,7 @@ export class GreyboxCorridor extends RoomRuntime implements PlayableRoom {
 
   private addStoryClockDisplay(clock: THREE.Group): void {
     const display = new THREE.Group();
-    display.name = 'STORY_CorridorClock_0317';
+    display.name = STORY_LOOP_ANCHOR.corridorClockObjectName;
     display.position.set(0.022, 0, 0);
     display.rotation.y = Math.PI / 2;
     display.scale.set(
@@ -829,14 +832,13 @@ export class GreyboxCorridor extends RoomRuntime implements PlayableRoom {
     } as const;
     const digitSegments = {
       '0': ['a', 'b', 'c', 'd', 'e', 'f'],
-      '1': ['b', 'c'],
       '3': ['a', 'b', 'c', 'd', 'g'],
-      '7': ['a', 'b', 'c'],
+      '4': ['b', 'c', 'f', 'g'],
     } as const;
     const digitXs = [-0.12, -0.055, 0.055, 0.12] as const;
 
-    for (const [digitIndex, digit] of ['0', '3', '1', '7'].entries()) {
-      for (const segmentId of digitSegments[digit as keyof typeof digitSegments]) {
+    for (const [digitIndex, digit] of STORY_LOOP_ANCHOR.clockDigits.entries()) {
+      for (const segmentId of digitSegments[digit]) {
         const [x, y] = segmentOffsets[segmentId];
         const segment = new THREE.Mesh(
           segmentId === 'b' ||
@@ -898,9 +900,16 @@ export class GreyboxCorridor extends RoomRuntime implements PlayableRoom {
       );
     const floor = standard('#ffffff', 0.88);
     floor.map = this.createFloorTexture();
+    const wall = standard('#81796c', 0.96);
+    wall.map = this.ownTexture(
+      createAgedPlasterTexture({
+        name: 'TEXTURE_Corridor_AgedPlaster',
+        seed: 3_043,
+      }),
+    );
 
     return {
-      wall: standard('#81796c', 0.96),
+      wall,
       wainscot: standard('#53605c', 0.9),
       floor,
       ceiling: standard('#c4bcae', 0.98),
@@ -939,35 +948,15 @@ export class GreyboxCorridor extends RoomRuntime implements PlayableRoom {
   }
 
   private createFloorTexture(): THREE.DataTexture {
-    const width = 32;
-    const height = 16;
-    const data = new Uint8Array(width * height * 4);
-    const woodA = new THREE.Color('#8c745c');
-    const woodB = new THREE.Color('#735f4d');
-    const seam = new THREE.Color('#4d4137');
-
-    for (let y = 0; y < height; y += 1) {
-      for (let x = 0; x < width; x += 1) {
-        const color = y === 0 || x % 16 === 0 ? seam : (y % 2 === 0 ? woodA : woodB);
-        const offset = (y * width + x) * 4;
-        data[offset] = Math.round(color.r * 255);
-        data[offset + 1] = Math.round(color.g * 255);
-        data[offset + 2] = Math.round(color.b * 255);
-        data[offset + 3] = 255;
-      }
-    }
-
-    const texture = this.ownTexture(
-      new THREE.DataTexture(data, width, height, THREE.RGBAFormat),
+    return this.ownTexture(
+      createWoodPlankFloorTexture({
+        name: 'TEXTURE_Corridor_WornWood',
+        seed: 3_043,
+        repeat: [1.5, 4.5],
+        plankColors: ['#8c745c', '#806951', '#735f4d', '#957a5e'],
+        seamColor: '#4d4137',
+      }),
     );
-    texture.wrapS = THREE.RepeatWrapping;
-    texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(3, 9);
-    texture.magFilter = THREE.NearestFilter;
-    texture.minFilter = THREE.LinearMipmapLinearFilter;
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.needsUpdate = true;
-    return texture;
   }
 
   private createArchitecture(): void {
@@ -1318,13 +1307,13 @@ export class GreyboxCorridor extends RoomRuntime implements PlayableRoom {
   }
 
   private createLighting(): void {
-    const hemisphere = new THREE.HemisphereLight('#d8dedb', '#5e5145', 0.95);
+    const hemisphere = new THREE.HemisphereLight('#94a1a5', '#3b2d26', 0.4);
     hemisphere.name = 'LIGHT_Corridor_Ambient';
-    const ambient = new THREE.AmbientLight('#b9aa95', 0.42);
+    const ambient = new THREE.AmbientLight('#c8c0b3', 0.12);
     ambient.name = 'LIGHT_Corridor_Bounce';
     const key = new THREE.SpotLight(
       '#ffd099',
-      2.1,
+      6.4,
       7.5,
       Math.PI / 3.4,
       0.52,
@@ -1340,13 +1329,13 @@ export class GreyboxCorridor extends RoomRuntime implements PlayableRoom {
     key.shadow.bias = -0.0002;
     key.shadow.normalBias = 0.025;
     key.shadow.radius = 2;
-    const northFill = new THREE.PointLight('#b7d0ca', 0.78, 4.2, 1.6);
+    const northFill = new THREE.PointLight('#9fb6b5', 0.35, 4.2, 1.6);
     northFill.name = 'LIGHT_Corridor_NorthFill';
     northFill.position.set(0.2, 1.7, -2.3);
-    const southFill = new THREE.PointLight('#ffbf80', 0.62, 3.6, 1.7);
+    const southFill = new THREE.PointLight('#ffbf80', 0.36, 3.6, 1.7);
     southFill.name = 'LIGHT_Corridor_SouthFill';
     southFill.position.set(-0.35, 1.75, 2.35);
-    const secondLegFill = new THREE.PointLight('#e2c49a', 0.88, 5.2, 1.6);
+    const secondLegFill = new THREE.PointLight('#e2c49a', 0.42, 5.2, 1.6);
     secondLegFill.name = 'LIGHT_Corridor_SecondLegFill';
     secondLegFill.position.set(4.35, 1.82, TURN_CENTER_Z);
     this.getVisualRoot().add(

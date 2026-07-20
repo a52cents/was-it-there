@@ -1,0 +1,21 @@
+{
+  "name": "Was It There?",
+  "short_name": "Was It There?",
+  "description": "Study each room, survive the blackout, and report what changed.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#050605",
+  "theme_color": "#090a0c",
+  "categories": ["games"],
+  "icons": [
+    {
+      "src": "./pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -59,4 +59,18 @@ describe('HousePressureLighting', () => {
     pressureLighting.release();
     expect(secondLight.intensity).toBe(3);
   });
+
+  it('dims and restores HDR environment lighting with the room lights', () => {
+    const root = new THREE.Group();
+    const scene = new THREE.Scene();
+    scene.environmentIntensity = 0.36;
+    const pressureLighting = new HousePressureLighting();
+
+    pressureLighting.bind(root, scene);
+    pressureLighting.apply(PRESSURED_SNAPSHOT);
+
+    expect(scene.environmentIntensity).toBeCloseTo(0.288);
+    pressureLighting.release();
+    expect(scene.environmentIntensity).toBeCloseTo(0.36);
+  });
 });

@@ -59,6 +59,12 @@ export class EscapeRouteProgression {
     return this.currentStep;
   }
 
+  public select(roomIndex: number): EscapeRoomStep {
+    const step = getEscapeRoomStep(roomIndex);
+    this.activeRoomIndex = step.roomIndex;
+    return step;
+  }
+
   public reset(): void {
     this.activeRoomIndex = 0;
   }

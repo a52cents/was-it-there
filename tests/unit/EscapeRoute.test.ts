@@ -68,6 +68,16 @@ describe('EscapeRoute', () => {
     expect(progression.currentStep.roomNumber).toBe(1);
   });
 
+  it('can select a room directly for development tools', () => {
+    const progression = new EscapeRouteProgression();
+
+    expect(progression.select(3).id).toBe('office');
+    expect(progression.currentStep.roomIndex).toBe(3);
+    expect(() => progression.select(10)).toThrow(
+      'outside the 10-room route',
+    );
+  });
+
   it('selects variable anomaly counts deterministically', () => {
     const step = getEscapeRoomStep(9);
     const first = selectAnomalyCount(step, 123_456);

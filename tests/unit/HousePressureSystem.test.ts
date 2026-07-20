@@ -34,7 +34,7 @@ describe('HousePressureSystem', () => {
     expect(settled.calmIntensity).toBe(0);
   });
 
-  it('runs a bounded takeover sequence and resolves at 03:17', () => {
+  it('runs a bounded takeover sequence and resolves at 03:04', () => {
     const system = new HousePressureSystem();
     const started = system.beginFailure();
 

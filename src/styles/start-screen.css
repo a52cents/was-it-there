@@ -1,10 +1,17 @@
 :root {
-  --start-screen-gutter: clamp(2rem, 7vw, 8rem);
-  --start-screen-width: min(32rem, calc(100vw - 4rem));
+  --start-screen-gutter: clamp(2rem, 7vw, 7.5rem);
+  --start-screen-end-gutter: clamp(1.5rem, 4vw, 4rem);
+  --start-screen-width: min(
+    32rem,
+    calc(
+      100vw - var(--start-screen-gutter) - var(--start-screen-end-gutter)
+    )
+  );
 }
 
 #menu-layer {
   display: block;
+  z-index: 2;
   overflow: hidden;
   background: transparent;
   transition: background-color 220ms ease;
@@ -18,14 +25,16 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(
-    90deg,
-    rgb(5 6 5 / 94%) 0%,
-    rgb(5 6 5 / 82%) 29%,
-    rgb(5 6 5 / 52%) 48%,
-    rgb(5 6 5 / 18%) 72%,
-    rgb(5 6 5 / 34%) 100%
-  );
+  background:
+    linear-gradient(
+      90deg,
+      rgb(5 6 5 / 97%) 0%,
+      rgb(5 6 5 / 88%) 30%,
+      rgb(5 6 5 / 54%) 50%,
+      rgb(5 6 5 / 16%) 72%,
+      rgb(5 6 5 / 38%) 100%
+    ),
+    linear-gradient(180deg, rgb(5 6 5 / 26%), transparent 24% 72%, rgb(5 6 5 / 42%));
   transition: opacity 220ms ease;
 }
 
@@ -41,19 +50,34 @@
   z-index: 2;
   display: flex;
   width: var(--start-screen-width);
-  max-width: 32rem;
-  align-items: flex-start;
-  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  justify-content: flex-start;
+  justify-content: safe center;
   gap: 0;
+  overflow-x: clip;
   overflow-y: auto;
-  padding: max(2rem, env(safe-area-inset-top)) 0
+  overscroll-behavior: contain;
+  padding: max(2rem, env(safe-area-inset-top)) 0.3rem
     max(2rem, env(safe-area-inset-bottom));
   text-align: left;
-  scrollbar-width: none;
+  scrollbar-color: rgb(238 233 223 / 24%) transparent;
+  scrollbar-width: thin;
 }
 
 .start-screen::-webkit-scrollbar {
-  display: none;
+  width: 3px;
+}
+
+.start-screen::-webkit-scrollbar-thumb {
+  background: rgb(238 233 223 / 24%);
+}
+
+.start-screen > * {
+  flex: 0 0 auto;
 }
 
 #menu-layer:not(.is-loading) .start-screen {
@@ -74,24 +98,36 @@
   letter-spacing: 0.08em;
 }
 
+.start-screen__time::before {
+  display: inline-block;
+  width: 1.25rem;
+  height: 1px;
+  margin-right: 0.55rem;
+  background: var(--memory-gold);
+  content: "";
+  vertical-align: middle;
+}
+
 .start-screen__title-block {
   position: static;
   display: block;
   width: 100%;
+  justify-items: start;
   margin-top: 0.85rem;
 }
 
 .start-screen h1 {
   position: static;
   display: flex;
+  width: 100%;
   max-width: none;
   flex-direction: column;
   margin: 0;
   color: var(--paper);
   font-family: var(--font-display);
-  font-size: clamp(4.7rem, 8.8vw, 8.1rem);
+  font-size: clamp(4.5rem, 8.6vw, 7.8rem);
   font-weight: 400;
-  line-height: 0.76;
+  line-height: 0.79;
   letter-spacing: -0.075em;
   text-shadow: none;
 }
@@ -103,9 +139,12 @@
 
 .start-screen h1 span {
   display: block;
+  max-width: 100%;
+  white-space: nowrap;
 }
 
 .start-screen__premise {
+  width: 100%;
   max-width: 27rem;
   margin-top: 1.45rem;
   color: rgb(238 233 223 / 72%);
@@ -114,9 +153,11 @@
   font-style: normal;
   line-height: 1.52;
   letter-spacing: 0;
+  overflow-wrap: break-word;
 }
 
 .start-screen__modes {
+  position: relative;
   display: block;
   width: 100%;
   margin-top: clamp(1.7rem, 3.5vh, 2.5rem);
@@ -128,13 +169,13 @@
   display: grid;
   width: 100%;
   min-width: 0;
-  grid-template-columns: 2.6rem minmax(0, 1fr);
+  grid-template-columns: 2.6rem minmax(0, 1fr) 1.25rem;
   gap: 0.8rem;
-  align-items: start;
+  align-items: center;
   border: 0;
   border-bottom: 1px solid rgb(238 233 223 / 18%);
   border-radius: 0;
-  padding: 0.92rem 0;
+  padding: 0.92rem 0.35rem;
   color: rgb(238 233 223 / 52%);
   background: transparent;
   box-shadow: none;
@@ -143,27 +184,47 @@
   opacity: 0.78;
   transition:
     color 150ms ease,
-    opacity 150ms ease;
+    opacity 150ms ease,
+    background-color 150ms ease;
+}
+
+.mode-option::after {
+  grid-column: 3;
+  color: transparent;
+  content: "\2192";
+  font-family: var(--font-interface);
+  font-size: 0.85rem;
+  transition:
+    color 150ms ease,
+    transform 150ms ease;
 }
 
 .mode-option:hover:not(:disabled) {
   border-color: rgb(238 233 223 / 18%);
   color: var(--paper);
-  background: transparent;
+  background: rgb(238 233 223 / 4%);
   transform: none;
   opacity: 1;
+}
+
+.mode-option:hover:not(:disabled)::after,
+.mode-option.is-selected::after {
+  color: var(--paper);
+}
+
+.mode-option:hover:not(:disabled)::after {
+  transform: translateX(0.15rem);
 }
 
 .mode-option.is-selected {
   border-color: rgb(238 233 223 / 18%);
   color: var(--paper);
-  background: transparent;
-  box-shadow: none;
+  background: linear-gradient(90deg, rgb(216 179 101 / 10%), transparent 70%);
+  box-shadow: inset 2px 0 0 var(--memory-gold);
   opacity: 1;
 }
 
 .mode-option__number {
-  padding-top: 0.05rem;
   color: rgb(238 233 223 / 38%);
   font-family: var(--font-interface);
   font-size: 0.62rem;
@@ -185,6 +246,7 @@
   font-family: var(--font-display);
   font-size: 0.88rem;
   line-height: 1.35;
+  overflow-wrap: break-word;
 }
 
 .mode-option strong {
@@ -202,7 +264,7 @@
 
 .mode-option:focus-visible {
   outline: 2px solid var(--paper);
-  outline-offset: 4px;
+  outline-offset: -2px;
 }
 
 .mode-option:disabled {
@@ -230,6 +292,7 @@
 .start-screen__actions {
   display: flex;
   width: 100%;
+  min-width: 0;
   align-items: center;
   gap: 1.15rem;
   margin-top: 1.55rem;
@@ -239,10 +302,11 @@
   position: static;
   display: inline-flex;
   min-width: min(17.5rem, 100%);
+  max-width: 100%;
   align-items: center;
   justify-content: space-between;
   gap: 2rem;
-  overflow: visible;
+  overflow: hidden;
   border: 1px solid var(--paper);
   border-radius: 0;
   padding: 0.92rem 1rem;
@@ -268,7 +332,7 @@
   width: auto;
   height: auto;
   background: transparent;
-  content: "→";
+  content: "\2192";
   font-family: var(--font-display);
   font-size: 1rem;
   font-weight: 400;
@@ -286,7 +350,7 @@
 
 #play-button:focus-visible {
   outline: 2px solid var(--paper);
-  outline-offset: 4px;
+  outline-offset: -3px;
 }
 
 #play-button:disabled {
@@ -334,6 +398,8 @@
   justify-content: flex-start;
   gap: 0.5rem 1.2rem;
   margin-top: 1.8rem;
+  border-top: 1px solid rgb(238 233 223 / 12%);
+  padding-top: 0.8rem;
   color: rgb(238 233 223 / 42%);
   font-family: var(--font-interface);
   font-size: clamp(0.5rem, 0.9vw, 0.59rem);
@@ -343,6 +409,20 @@
 
 .start-screen__controls span {
   display: inline;
+}
+
+.start-screen__controls .touch-only {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .start-screen__controls .desktop-only {
+    display: none;
+  }
+
+  .start-screen__controls .touch-only {
+    display: inline;
+  }
 }
 
 @keyframes start-screen-reveal {
@@ -358,10 +438,7 @@
 @media (max-width: 760px) {
   :root {
     --start-screen-gutter: max(1.25rem, env(safe-area-inset-left));
-    --start-screen-width: calc(
-      100vw -
-        max(2.5rem, env(safe-area-inset-left) + env(safe-area-inset-right))
-    );
+    --start-screen-end-gutter: max(1.25rem, env(safe-area-inset-right));
   }
 
   .menu-backdrop {
@@ -374,8 +451,10 @@
   }
 
   .start-screen {
-    max-width: 30rem;
-    padding-right: max(1.25rem, env(safe-area-inset-right));
+    right: max(1.25rem, env(safe-area-inset-right));
+    left: max(1.25rem, env(safe-area-inset-left));
+    width: auto;
+    padding-right: 0.3rem;
   }
 
   .start-screen h1 {
@@ -426,12 +505,8 @@
 }
 
 @media (max-width: 480px) {
-  .start-screen {
-    width: calc(100vw - 2.5rem);
-  }
-
   .start-screen h1 {
-    font-size: clamp(3.7rem, 20vw, 5.4rem);
+    font-size: clamp(3.7rem, 18.5vw, 5.1rem);
   }
 
   .start-screen__premise {
@@ -440,12 +515,38 @@
   }
 
   .mode-option {
-    grid-template-columns: 2.2rem minmax(0, 1fr);
+    grid-template-columns: 2.2rem minmax(0, 1fr) 1rem;
     gap: 0.55rem;
   }
 
   .start-screen__controls {
     gap: 0.45rem 0.85rem;
+  }
+}
+
+@media (max-height: 560px) {
+  .start-screen {
+    padding-top: max(0.8rem, env(safe-area-inset-top));
+    padding-bottom: max(0.8rem, env(safe-area-inset-bottom));
+  }
+
+  .start-screen__title-block {
+    margin-top: 0.55rem;
+  }
+
+  .start-screen h1 {
+    font-size: clamp(3.4rem, 12.5vh, 4.8rem);
+  }
+
+  .start-screen__premise,
+  .start-screen__modes,
+  .start-screen__actions,
+  .start-screen__controls {
+    margin-top: 0.8rem;
+  }
+
+  .mode-option {
+    padding-block: 0.55rem;
   }
 }
 

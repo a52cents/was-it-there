@@ -16,6 +16,7 @@ import {
 } from '../assets/AssetManager';
 import type { RoomDefinition } from '../RoomDefinition';
 import { RoomRuntime } from '../RoomRuntime';
+import { createAgedPlasterTexture } from '../textures/AgedPlasterTexture';
 import type { PlayableRoom } from './PlayableRoom';
 
 type Vector3Tuple = readonly [number, number, number];
@@ -35,13 +36,6 @@ type BedroomAnomalyTargetId =
   | 'bookcase'
   | 'radio'
   | 'photo-frame';
-
-interface BedroomRotationAnomalyProfile {
-  readonly rotations: readonly {
-    readonly id: string;
-    readonly offsetRadians: Vector3Tuple;
-  }[];
-}
 
 interface BedroomMaterials {
   readonly wall: THREE.MeshStandardMaterial;
@@ -91,6 +85,10 @@ const ENTRANCE_WIDTH = 1;
 const EXIT_CENTER_Z = -1.75;
 const EXIT_WIDTH = 1;
 const DOOR_HEIGHT = 2.15;
+const WINDOW_CENTER_Y = 1.65;
+const WINDOW_CENTER_Z = 0.72;
+const WINDOW_WIDTH = 1.62;
+const WINDOW_HEIGHT = 1.18;
 
 interface FittedAssetPlacement {
   readonly asset: GlbAssetDefinition;
@@ -162,128 +160,6 @@ const FINAL_IMPORTED_MATERIAL_STYLES = {
     metalness: 0,
   },
 } as const satisfies Record<string, ImportedMaterialStyle>;
-
-const AUTOMATIC_ROTATION_RADIANS = Math.PI / 6;
-
-const BEDROOM_ROTATION_ANOMALY_PROFILES = {
-  television: {
-    rotations: [
-      {
-        id: 'turned-left',
-        offsetRadians: [0, AUTOMATIC_ROTATION_RADIANS, 0],
-      },
-      {
-        id: 'turned-right',
-        offsetRadians: [0, -AUTOMATIC_ROTATION_RADIANS, 0],
-      },
-    ],
-  },
-  chair: {
-    rotations: [
-      {
-        id: 'turned-left',
-        offsetRadians: [0, AUTOMATIC_ROTATION_RADIANS, 0],
-      },
-      {
-        id: 'turned-right',
-        offsetRadians: [0, -AUTOMATIC_ROTATION_RADIANS, 0],
-      },
-    ],
-  },
-  plant: {
-    rotations: [],
-  },
-  picture: {
-    rotations: [
-      {
-        id: 'tilted-left',
-        offsetRadians: [0, 0, AUTOMATIC_ROTATION_RADIANS],
-      },
-      {
-        id: 'tilted-right',
-        offsetRadians: [0, 0, -AUTOMATIC_ROTATION_RADIANS],
-      },
-    ],
-  },
-  lamp: {
-    rotations: [],
-  },
-  books: {
-    rotations: [
-      {
-        id: 'turned-left',
-        offsetRadians: [0, AUTOMATIC_ROTATION_RADIANS, 0],
-      },
-      {
-        id: 'turned-right',
-        offsetRadians: [0, -AUTOMATIC_ROTATION_RADIANS, 0],
-      },
-    ],
-  },
-  bed: {
-    rotations: [],
-  },
-  wardrobe: {
-    rotations: [],
-  },
-  nightstand: {
-    rotations: [
-      {
-        id: 'turned-left',
-        offsetRadians: [0, AUTOMATIC_ROTATION_RADIANS, 0],
-      },
-      {
-        id: 'turned-right',
-        offsetRadians: [0, -AUTOMATIC_ROTATION_RADIANS, 0],
-      },
-    ],
-  },
-  'tv-cabinet': {
-    rotations: [],
-  },
-  rug: {
-    rotations: [
-      {
-        id: 'turned-left',
-        offsetRadians: [0, AUTOMATIC_ROTATION_RADIANS, 0],
-      },
-      {
-        id: 'turned-right',
-        offsetRadians: [0, -AUTOMATIC_ROTATION_RADIANS, 0],
-      },
-    ],
-  },
-  bookcase: {
-    rotations: [],
-  },
-  radio: {
-    rotations: [
-      {
-        id: 'turned-left',
-        offsetRadians: [0, AUTOMATIC_ROTATION_RADIANS, 0],
-      },
-      {
-        id: 'turned-right',
-        offsetRadians: [0, -AUTOMATIC_ROTATION_RADIANS, 0],
-      },
-    ],
-  },
-  'photo-frame': {
-    rotations: [
-      {
-        id: 'turned-left',
-        offsetRadians: [0, AUTOMATIC_ROTATION_RADIANS, 0],
-      },
-      {
-        id: 'turned-right',
-        offsetRadians: [0, -AUTOMATIC_ROTATION_RADIANS, 0],
-      },
-    ],
-  },
-} as const satisfies Record<
-  BedroomAnomalyTargetId,
-  BedroomRotationAnomalyProfile
->;
 
 const BEDROOM_COLLIDER_NAMES: Partial<
   Record<BedroomAnomalyTargetId, string>
@@ -583,18 +459,11 @@ const SUPPLEMENTARY_ANOMALY_PLACEMENTS: readonly SupplementaryAnomalyPlacement[]
 ] as const;
 
 function createAutomaticAnomalyVariants(
-  targetId: BedroomAnomalyTargetId,
+  _targetId: BedroomAnomalyTargetId,
 ): readonly PreparedAnomalyVariant[] {
-  const profile = BEDROOM_ROTATION_ANOMALY_PROFILES[targetId];
-
   return [
     { id: 'hidden', kind: 'hide' },
     { id: 'appeared', kind: 'show' },
-    ...profile.rotations.map(({ id, offsetRadians }) => ({
-      id,
-      kind: 'rotate' as const,
-      rotationOffsetRadians: offsetRadians,
-    })),
   ];
 }
 
@@ -1645,9 +1514,16 @@ export class GreyboxBedroom extends RoomRuntime implements PlayableRoom {
     const floorTexture = this.createWoodFloorTexture();
     const floorMaterial = standard(0xffffff, 0.88);
     floorMaterial.map = floorTexture;
+    const wallMaterial = standard(0xd8d0c3, 0.94);
+    wallMaterial.map = this.ownTexture(
+      createAgedPlasterTexture({
+        name: 'TEXTURE_Bedroom_AgedPlaster',
+        seed: 3_017,
+      }),
+    );
 
     return {
-      wall: standard(0xd8d0c3, 0.94),
+      wall: wallMaterial,
       wallAccent: standard(0xc8bdae, 0.96),
       floor: floorMaterial,
       ceiling: standard(0xf1ede5, 0.94),
@@ -1794,12 +1670,7 @@ export class GreyboxBedroom extends RoomRuntime implements PlayableRoom {
         [0, ROOM_HEIGHT / 2, -ROOM_LENGTH / 2],
         materials.wall,
       ),
-      this.createVisualBox(
-        'WALL_West',
-        [WALL_THICKNESS, ROOM_HEIGHT, ROOM_LENGTH],
-        [-ROOM_WIDTH / 2, ROOM_HEIGHT / 2, 0],
-        materials.wall,
-      ),
+      this.createWestWall(),
     );
 
     architectureRoot.add(this.createSouthWall(), this.createEastWall());
@@ -1845,6 +1716,59 @@ export class GreyboxBedroom extends RoomRuntime implements PlayableRoom {
       ),
     );
     wall.position.z = ROOM_LENGTH / 2;
+    return wall;
+  }
+
+  private createWestWall(): THREE.Group {
+    const materials = this.requireMaterials();
+    const wall = new THREE.Group();
+    wall.name = 'WALL_West';
+    const openingMinimumZ = WINDOW_CENTER_Z - WINDOW_WIDTH / 2;
+    const openingMaximumZ = WINDOW_CENTER_Z + WINDOW_WIDTH / 2;
+    const openingMinimumY = WINDOW_CENTER_Y - WINDOW_HEIGHT / 2;
+    const openingMaximumY = WINDOW_CENTER_Y + WINDOW_HEIGHT / 2;
+    const northLength = openingMinimumZ + ROOM_LENGTH / 2;
+    const southLength = ROOM_LENGTH / 2 - openingMaximumZ;
+    const topHeight = ROOM_HEIGHT - openingMaximumY;
+
+    wall.add(
+      this.createVisualBox(
+        'WALL_West_North',
+        [WALL_THICKNESS, ROOM_HEIGHT, northLength],
+        [
+          -ROOM_WIDTH / 2,
+          ROOM_HEIGHT / 2,
+          -ROOM_LENGTH / 2 + northLength / 2,
+        ],
+        materials.wall,
+      ),
+      this.createVisualBox(
+        'WALL_West_South',
+        [WALL_THICKNESS, ROOM_HEIGHT, southLength],
+        [
+          -ROOM_WIDTH / 2,
+          ROOM_HEIGHT / 2,
+          openingMaximumZ + southLength / 2,
+        ],
+        materials.wall,
+      ),
+      this.createVisualBox(
+        'WALL_West_WindowBottom',
+        [WALL_THICKNESS, openingMinimumY, WINDOW_WIDTH],
+        [-ROOM_WIDTH / 2, openingMinimumY / 2, WINDOW_CENTER_Z],
+        materials.wall,
+      ),
+      this.createVisualBox(
+        'WALL_West_WindowTop',
+        [WALL_THICKNESS, topHeight, WINDOW_WIDTH],
+        [
+          -ROOM_WIDTH / 2,
+          openingMaximumY + topHeight / 2,
+          WINDOW_CENTER_Z,
+        ],
+        materials.wall,
+      ),
+    );
     return wall;
   }
 
@@ -2053,10 +1977,10 @@ export class GreyboxBedroom extends RoomRuntime implements PlayableRoom {
     const window = new THREE.Group();
     window.name = 'ARCH_Window_West';
     const x = -ROOM_WIDTH / 2 + WALL_THICKNESS / 2 + 0.04;
-    const centerY = 1.65;
-    const centerZ = 0.72;
-    const width = 1.62;
-    const height = 1.18;
+    const centerY = WINDOW_CENTER_Y;
+    const centerZ = WINDOW_CENTER_Z;
+    const width = WINDOW_WIDTH;
+    const height = WINDOW_HEIGHT;
     const frame = 0.085;
 
     window.add(
@@ -2311,16 +2235,16 @@ export class GreyboxBedroom extends RoomRuntime implements PlayableRoom {
   }
 
   private createLighting(): void {
-    const hemisphere = new THREE.HemisphereLight(0xc9d7e3, 0x4a3930, 0.68);
+    const hemisphere = new THREE.HemisphereLight(0x94a1a5, 0x3b2d26, 0.4);
     hemisphere.name = 'LIGHT_Ambient';
-    const roomBounce = new THREE.AmbientLight(0xe7ecf0, 0.36);
+    const roomBounce = new THREE.AmbientLight(0xc8c0b3, 0.12);
     roomBounce.name = 'LIGHT_RoomBounce';
     const ceilingLight = new THREE.SpotLight(
       0xffc477,
-      7.2,
+      6.4,
       8.5,
-      Math.PI * 0.42,
-      0.5,
+      Math.PI * 0.32,
+      0.64,
       2,
     );
     ceilingLight.name = 'LIGHT_Ceiling';
@@ -2333,13 +2257,26 @@ export class GreyboxBedroom extends RoomRuntime implements PlayableRoom {
     ceilingLight.shadow.bias = -0.00025;
     ceilingLight.shadow.normalBias = 0.025;
     ceilingLight.shadow.radius = 2;
-    const ceilingBounce = new THREE.PointLight(0xffb85c, 0.65, 1.8, 2);
+    const ceilingBounce = new THREE.PointLight(0xffb85c, 0.36, 1.8, 2);
     ceilingBounce.name = 'LIGHT_CeilingBounce';
     ceilingBounce.position.set(0, 2.42, 0.2);
-    const fillLight = new THREE.DirectionalLight(0xc6dcf2, 0.48);
+    const fillLight = new THREE.DirectionalLight(0x829da6, 0.27);
     fillLight.name = 'LIGHT_WindowFill';
     fillLight.position.set(-4.2, 4.8, 3.4);
     fillLight.target.position.set(0.5, 0.45, -0.7);
+    const windowAreaLight = new THREE.RectAreaLight(
+      0xaed8e5,
+      0.72,
+      WINDOW_WIDTH,
+      WINDOW_HEIGHT,
+    );
+    windowAreaLight.name = 'LIGHT_WindowArea';
+    windowAreaLight.position.set(
+      -ROOM_WIDTH / 2 + 0.12,
+      WINDOW_CENTER_Y,
+      WINDOW_CENTER_Z,
+    );
+    windowAreaLight.lookAt(0.4, 1.05, WINDOW_CENTER_Z);
     this.getVisualRoot().add(
       hemisphere,
       roomBounce,
@@ -2348,6 +2285,7 @@ export class GreyboxBedroom extends RoomRuntime implements PlayableRoom {
       ceilingBounce,
       fillLight,
       fillLight.target,
+      windowAreaLight,
     );
   }
 

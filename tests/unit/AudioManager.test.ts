@@ -254,6 +254,13 @@ describe('AudioManager', () => {
     manager.play('story-corridor-ring');
     manager.play('story-corridor-prediction');
     manager.play('story-corridor-failure');
+    manager.play('story-office-radio-pattern');
+    manager.play('story-office-radio-silence');
+    manager.play('story-office-erased-name');
+    manager.play('story-office-failure');
+    manager.play('story-kitchen-reverse-breakfast');
+    manager.play('story-kitchen-chair-scrape');
+    manager.play('story-kitchen-failure');
     manager.play('door-unlock');
     manager.play('door-open');
 
@@ -278,6 +285,13 @@ describe('AudioManager', () => {
       'story-corridor-ring',
       'story-corridor-prediction',
       'story-corridor-failure',
+      'story-office-radio-pattern',
+      'story-office-radio-silence',
+      'story-office-erased-name',
+      'story-office-failure',
+      'story-kitchen-reverse-breakfast',
+      'story-kitchen-chair-scrape',
+      'story-kitchen-failure',
       'door-unlock',
       'door-open',
     ]);

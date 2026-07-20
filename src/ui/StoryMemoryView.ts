@@ -1,7 +1,11 @@
+import { STORY_LOOP_ANCHOR } from '../content/story/StoryLoopAnchor';
+
 export const STORY_SCREEN_EFFECT_IDS = [
   'bedroom-empty-place',
   'bathroom-condensation-failure',
   'corridor-ringing-failure',
+  'office-erased-name',
+  'kitchen-service-ticket',
 ] as const;
 export type StoryScreenEffectId =
   (typeof STORY_SCREEN_EFFECT_IDS)[number];
@@ -42,7 +46,7 @@ export class StoryMemoryView {
     const condensation = document.createElement('div');
     condensation.className = 'story-memory__condensation';
     const warning = document.createElement('p');
-    warning.textContent = '03:17';
+    warning.textContent = STORY_LOOP_ANCHOR.displayTime;
     condensation.append(warning);
 
     const ringing = document.createElement('div');
@@ -50,9 +54,47 @@ export class StoryMemoryView {
     const ringCore = document.createElement('span');
     ringCore.setAttribute('aria-hidden', 'true');
     const ringingCaption = document.createElement('p');
-    ringingCaption.textContent = 'NO CALLER // 03:17';
+    ringingCaption.textContent = `NO CALLER // ${STORY_LOOP_ANCHOR.displayTime}`;
     ringing.append(ringCore, ringingCaption);
-    this.element.append(photograph, condensation, ringing);
+
+    const officeRecord = document.createElement('div');
+    officeRecord.className = 'story-memory__office-record';
+    const recordLabel = document.createElement('span');
+    recordLabel.textContent = 'RESIDENT RECORD // SUBJECT 04';
+    const erasedName = document.createElement('p');
+    erasedName.textContent = 'NAME // ███████████';
+    const recordTime = document.createElement('time');
+    recordTime.textContent = STORY_LOOP_ANCHOR.displayTime;
+    officeRecord.append(recordLabel, erasedName, recordTime);
+
+    const serviceTicket = document.createElement('div');
+    serviceTicket.className = 'story-memory__service-ticket';
+    const serviceLabel = document.createElement('span');
+    serviceLabel.textContent = 'KITCHEN SERVICE // TABLE 04';
+    const places = document.createElement('ol');
+
+    for (const copy of [
+      'PLACE 01 // SERVED',
+      'PLACE 02 // SERVED',
+      'PLACE 03 // SERVED',
+      'PLACE 04 // REMOVED BEFORE SERVICE',
+    ]) {
+      const place = document.createElement('li');
+      place.textContent = copy;
+      places.append(place);
+    }
+
+    const serviceTime = document.createElement('time');
+    serviceTime.textContent = STORY_LOOP_ANCHOR.displayTime;
+    serviceTicket.append(serviceLabel, places, serviceTime);
+
+    this.element.append(
+      photograph,
+      condensation,
+      ringing,
+      officeRecord,
+      serviceTicket,
+    );
     root.append(this.element);
   }
 

@@ -1,9 +1,14 @@
 import * as THREE from 'three';
+import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
+import kloppenheimNightSkyUrl from '../assets/environment/kloppenheim-07-pure-sky-1k.hdr?url';
 import { AudioManager } from '../audio/AudioManager';
 import { RoomAudioDirector } from '../audio/RoomAudioDirector';
 import { deriveRoomSeed } from '../core/random/SeededRandom';
 import { STORY_EVENT_CATALOG } from '../content/story/StoryEventCatalog';
-import { STORY_INTERACTION_CATALOG } from '../content/story/StoryInteractionCatalog';
+import {
+  STORY_DISAPPEARANCE_PROTECTED_TARGET_IDS_BY_ROOM,
+  STORY_INTERACTION_CATALOG,
+} from '../content/story/StoryInteractionCatalog';
 import { GreyboxDebugRuntime } from '../debug/GreyboxDebugRuntime';
 import { parseLevelBuilderDocument } from '../debug/level-builder/LevelBuilderDocument';
 import {
@@ -19,6 +24,7 @@ import { TargetReportHighlight } from '../gameplay/interaction/TargetReportHighl
 import { ExitDoorController } from '../gameplay/progression/ExitDoorController';
 import { ExitThresholdDetector } from '../gameplay/progression/ExitThresholdDetector';
 import {
+  ESCAPE_ROUTE,
   EscapeRouteProgression,
   selectAnomalyCount,
 } from '../gameplay/progression/EscapeRoute';
@@ -32,6 +38,11 @@ import {
   type RunErrorKind,
 } from '../gameplay/run/RunErrorTracker';
 import { StoryDirector } from '../gameplay/story/StoryDirector';
+import {
+  isFirstStoryChapterFinalRoom,
+  resolveFirstChapterOutcome,
+  type StoryChapterOutcome,
+} from '../gameplay/story/StoryChapterOutcome';
 import { StoryEffectRuntime } from '../gameplay/story/StoryEffectRuntime';
 import { StoryExitGate } from '../gameplay/story/StoryExitGate';
 import {
@@ -49,11 +60,14 @@ import {
 } from '../gameplay/story/StoryInteraction';
 import { DesktopInput } from '../input/DesktopInput';
 import { InputManager } from '../input/InputManager';
+import { TouchInput } from '../input/TouchInput';
 import type { PlatformManager } from '../platform/PlatformManager';
 import { PlayerController } from '../player/PlayerController';
 import { CameraManager } from '../rendering/CameraManager';
+import { createAtmosphereProfile } from '../rendering/AtmosphereProfile';
 import { HousePressureLighting } from '../rendering/HousePressureLighting';
 import { RendererManager } from '../rendering/RendererManager';
+import { createAmbientSkyTexture } from '../rendering/SceneAmbience';
 import { PhaseTimerDisplay } from '../ui/PhaseTimerDisplay';
 import { BlackoutView } from '../ui/BlackoutView';
 import { GameOverScreen } from '../ui/GameOverScreen';
@@ -71,12 +85,16 @@ import { AssetManager } from '../world/assets/AssetManager';
 import { GreyboxBathroom } from '../world/rooms/GreyboxBathroom';
 import { GreyboxBedroom } from '../world/rooms/GreyboxBedroom';
 import { GreyboxCorridor } from '../world/rooms/GreyboxCorridor';
+import { GreyboxDiningRoom } from '../world/rooms/GreyboxDiningRoom';
+import { GreyboxKitchen } from '../world/rooms/GreyboxKitchen';
 import { GreyboxOffice } from '../world/rooms/GreyboxOffice';
 import type { PlayableRoom } from '../world/rooms/PlayableRoom';
 import { RoomPreloader } from '../world/RoomPreloader';
 import bathroomAnomalyCatalog from '../world/rooms/greybox-bathroom-anomalies.json';
 import bedroomAnomalyCatalog from '../world/rooms/greybox-bedroom-anomalies.json';
 import corridorAnomalyCatalog from '../world/rooms/first-corridor-anomalies.json';
+import diningRoomAnomalyCatalog from '../world/rooms/dining-room-anomalies.json';
+import kitchenAnomalyCatalog from '../world/rooms/kitchen-anomalies.json';
 import officeAnomalyCatalog from '../world/rooms/office-anomalies.json';
 import { WorldCollision } from '../world/WorldCollision';
 import { GameLoop } from './GameLoop';
@@ -104,10 +122,19 @@ export interface GameAppElements {
 const POINTER_LOCK_COPY = {
   resume: 'RETURN TO THE ROOM',
   unavailable: 'RETRY MOUSE CAPTURE',
+  touchResume: 'TAP TO RETURN',
 } as const;
+
+const LEVEL_BUILDER_ROOMS = ESCAPE_ROUTE.slice(0, 6).map((step) => ({
+  roomIndex: step.roomIndex,
+  id: step.id,
+  label: `${String(step.roomNumber).padStart(2, '0')} · ${step.displayName}`,
+}));
 
 export class GameApp {
   private readonly scene = new THREE.Scene();
+  private readonly ambientSkyTexture = createAmbientSkyTexture();
+  private ambientEnvironmentTexture: THREE.DataTexture | null = null;
   private readonly gameStateMachine = new GameStateMachine();
   private readonly runTimer = new RunTimer();
   private readonly blackoutTimeline = new BlackoutTimeline();
@@ -134,9 +161,10 @@ export class GameApp {
   private readonly victoryScreen: VictoryScreen;
   private readonly inputManager = new InputManager();
   private readonly desktopInput: DesktopInput;
+  private readonly touchInput: TouchInput;
   private readonly playerController: PlayerController;
   private debugRuntime: GreyboxDebugRuntime | null = null;
-  private debugVisible = true;
+  private debugVisible = false;
   private readonly worldCollision = new WorldCollision();
   private readonly assetManager = new AssetManager();
   private readonly roomPreloader = new RoomPreloader<PlayableRoom>(
@@ -180,10 +208,13 @@ export class GameApp {
   private runIdentity: RunIdentity | null = null;
   private pendingAnomalyPlan: AnomalyPlan | null = null;
   private anomalyAppliedDuringBlackout = false;
+  private rewardedReviveUsed = false;
+  private failedOutcomeRecordedForRun = false;
   private nextRunSeedOverride: number | null = null;
   private gameOverRevealTarget: THREE.Object3D | null = null;
   private readonly gameOverRevealCenter = new THREE.Vector3();
   private roomTransitionPromise: Promise<void> | null = null;
+  private levelBuilderRoomChangePromise: Promise<void> | null = null;
 
   public constructor(
     private readonly elements: GameAppElements,
@@ -196,7 +227,8 @@ export class GameApp {
       );
     }
 
-    this.scene.background = new THREE.Color(0x2d2927);
+    this.scene.background = this.ambientSkyTexture;
+    this.scene.backgroundIntensity = 0.65;
     this.room.mount({ scene: this.scene, worldCollision: this.worldCollision });
     this.targetSelector = new AnomalyTargetSelector(
       this.room.getAnomalyTargetRegistry(),
@@ -253,10 +285,6 @@ export class GameApp {
       this.audioManager,
       this.storySubtitleView,
       this.storyMemoryView,
-      {
-        onHelperVisibility: (bindingId, visible) =>
-          this.setStoryHelperVisibility(bindingId, visible),
-      },
     );
     this.storyDirector = new StoryDirector(
       STORY_EVENT_CATALOG,
@@ -270,6 +298,9 @@ export class GameApp {
     this.roomCompleteBanner = new RoomCompleteBanner(elements.hudLayer);
     this.gameOverScreen = new GameOverScreen(elements.modalLayer);
     this.gameOverScreen.onTryAgain(() => this.tryAgain());
+    this.gameOverScreen.onRewardedContinue(() =>
+      this.continueWithRewardedAd(),
+    );
     this.victoryScreen = new VictoryScreen(elements.modalLayer);
     this.victoryScreen.onPlayAgain(() => this.playAgain());
     this.victoryScreen.onReturnToMenu(() => this.returnToModeSelect());
@@ -282,10 +313,16 @@ export class GameApp {
       onPointerLockChange: this.handlePointerLockChange,
       onPointerLockError: this.handlePointerLockError,
     });
+    this.touchInput = new TouchInput({
+      inputManager: this.inputManager,
+      canvas: elements.canvas,
+      hudLayer: elements.hudLayer,
+      onPause: this.handleTouchPause,
+    });
     this.playerController = new PlayerController(
       this.cameraManager.camera,
       this.inputManager,
-      () => this.desktopInput.isPointerLocked(),
+      () => this.isGameplayInputActive(),
       this.worldCollision,
       this.room.getPlayerSpawn(),
     );
@@ -326,11 +363,18 @@ export class GameApp {
     platform.loadingStart();
 
     try {
-      await this.room.loadAssets(this.assetManager);
-      this.housePressureLighting.bind(this.room.getVisualRoot());
+      await Promise.all([
+        this.room.loadAssets(this.assetManager),
+        this.loadAmbientEnvironment(),
+      ]);
+      this.housePressureLighting.bind(
+        this.room.getVisualRoot(),
+        this.scene,
+      );
       this.registerActiveRoomCatalog();
       this.rendererManager.resize();
       this.desktopInput.attach();
+      this.touchInput.attach();
       this.startScreen.onStart((mode) => this.startExperience(mode));
       const storySave = this.storySaveRepository.load();
       this.storyProgress.hydrate(storySave.progress);
@@ -377,6 +421,7 @@ export class GameApp {
     this.debugRuntime?.dispose();
     this.roomPreloader.dispose();
     this.desktopInput.detach();
+    this.touchInput.detach();
     this.unsubscribeGameState();
     this.unsubscribeStoryProgress?.();
     this.unsubscribeStoryProgress = null;
@@ -401,7 +446,33 @@ export class GameApp {
     this.room.unmount();
     this.rendererManager.dispose();
 
+    this.scene.background = null;
+    this.scene.environment = null;
+    this.ambientEnvironmentTexture?.dispose();
+    this.ambientEnvironmentTexture = null;
+    this.ambientSkyTexture.dispose();
     this.scene.clear();
+  }
+
+  private async loadAmbientEnvironment(): Promise<void> {
+    const texture = await new HDRLoader().loadAsync(kloppenheimNightSkyUrl);
+
+    if (this.destroyed) {
+      texture.dispose();
+      return;
+    }
+
+    texture.name = 'TEXTURE_KloppenheimNightSky_HDR';
+    texture.mapping = THREE.EquirectangularReflectionMapping;
+    this.ambientEnvironmentTexture?.dispose();
+    this.ambientEnvironmentTexture = texture;
+    this.scene.background = texture;
+    this.scene.backgroundIntensity = 0.2;
+    this.scene.backgroundBlurriness = 0.12;
+    this.scene.backgroundRotation.y = Math.PI * 0.62;
+    this.scene.environment = texture;
+    this.scene.environmentIntensity = 0.05;
+    this.scene.environmentRotation.y = Math.PI * 0.62;
   }
 
   private async startExperience(mode: GameMode): Promise<void> {
@@ -503,10 +574,7 @@ export class GameApp {
         )
       ) {
         if (
-          this.roomProgression.hasNextRoom &&
-          this.isRoomBuilt(
-            this.roomProgression.currentStep.roomIndex + 1,
-          )
+          this.canAdvanceToNextRoom()
         ) {
           this.gameStateMachine.transitionTo('room-transition');
           void this.transitionToNextRoom();
@@ -549,7 +617,6 @@ export class GameApp {
     this.phaseTimerDisplay.update(
       this.gameStateMachine.currentState,
       this.runTimer.getSnapshot(),
-      this.getStoryObservationInstruction(),
     );
     const reportSnapshot = this.reportSystem.getSnapshot();
     const errorSnapshot = this.runErrorTracker.getSnapshot();
@@ -562,6 +629,18 @@ export class GameApp {
       errorCount: errorSnapshot.errorCount,
       maximumErrors: errorSnapshot.maximumErrors,
     });
+    const touchActionLabel = this.gameStateMachine.currentState === 'search'
+      ? 'REPORT'
+      : this.gameStateMachine.currentState === 'room-complete'
+        ? 'EXAMINE'
+        : 'ACTION';
+    this.touchInput.setActionContext(
+      touchActionLabel,
+      (this.gameStateMachine.currentState === 'search' &&
+        this.aimedTargetId !== null) ||
+        (this.gameStateMachine.currentState === 'room-complete' &&
+          this.aimedStoryInteraction !== null),
+    );
     this.roomCompleteBanner.update();
     if (!levelBuilderOpen) {
       this.debugRuntime?.update();
@@ -577,20 +656,13 @@ export class GameApp {
   }
 
   private applyHousePressure(snapshot: HousePressureSnapshot): void {
+    const atmosphere = createAtmosphereProfile(snapshot);
     this.housePressureLighting.apply(snapshot);
     this.housePressureView.apply(snapshot);
-  }
-
-  private setStoryHelperVisibility(
-    bindingId: string,
-    visible: boolean,
-  ): void {
-    if (
-      bindingId === 'bathroom-mirror-fog' &&
-      this.room instanceof GreyboxBathroom
-    ) {
-      this.room.setStoryMirrorFogVisible(visible);
-    }
+    this.rendererManager.setAtmosphereProfile(
+      atmosphere.stress,
+      atmosphere.calmPulse,
+    );
   }
 
   private configureRoomGameplaySystems(room: PlayableRoom): void {
@@ -619,6 +691,8 @@ export class GameApp {
       bathroom: bathroomAnomalyCatalog,
       'first-corridor': corridorAnomalyCatalog,
       'greybox-bedroom': bedroomAnomalyCatalog,
+      'dining-room': diningRoomAnomalyCatalog,
+      kitchen: kitchenAnomalyCatalog,
       office: officeAnomalyCatalog,
     } as const;
     const catalog = catalogs[this.room.definition.id as keyof typeof catalogs];
@@ -669,7 +743,7 @@ export class GameApp {
     this.roomCompleteBanner.reset();
     this.roomAudioDirector.finishRoom();
     this.housePressureLighting.release();
-    this.blackoutView.begin(previousRoom.getVisualRoot());
+    this.blackoutView.begin(previousRoom.getVisualRoot(), this.scene);
     this.blackoutView.apply({
       stage: 'full-black',
       elapsedMs: 0,
@@ -749,7 +823,7 @@ export class GameApp {
   }
 
   private finishRoomTransition(): void {
-    this.housePressureLighting.bind(this.room.getVisualRoot());
+    this.housePressureLighting.bind(this.room.getVisualRoot(), this.scene);
     this.applyHousePressure(this.housePressureSystem.getSnapshot());
     this.resetPlayer();
     this.blackoutView.reset();
@@ -759,7 +833,7 @@ export class GameApp {
     this.storyDirector.enterRoom(this.room.definition.id);
     this.gameStateMachine.transitionTo('room-intro');
 
-    if (this.desktopInput.isPointerLocked()) {
+    if (this.isGameplayInputActive()) {
       this.gameStateMachine.transitionTo('observation');
       this.setGameplayActive(true);
     } else {
@@ -768,6 +842,10 @@ export class GameApp {
   }
 
   private createRoom(roomIndex: number): PlayableRoom {
+    if (roomIndex === 0) {
+      return new GreyboxBedroom();
+    }
+
     if (roomIndex === 1) {
       return new GreyboxBathroom();
     }
@@ -780,18 +858,40 @@ export class GameApp {
       return new GreyboxOffice();
     }
 
+    if (roomIndex === 4) {
+      return new GreyboxKitchen();
+    }
+
+    if (roomIndex === 5) {
+      return new GreyboxDiningRoom();
+    }
+
     throw new Error(`Room ${roomIndex + 1} has not been built yet.`);
   }
 
   private isRoomBuilt(roomIndex: number): boolean {
-    return roomIndex >= 0 && roomIndex <= 3;
+    return roomIndex >= 0 && roomIndex <= 5;
+  }
+
+  private canAdvanceToNextRoom(): boolean {
+    if (
+      this.runIdentity?.mode === 'story' &&
+      isFirstStoryChapterFinalRoom(this.roomProgression.currentStep.id)
+    ) {
+      return false;
+    }
+
+    return (
+      this.roomProgression.hasNextRoom &&
+      this.isRoomBuilt(this.roomProgression.currentStep.roomIndex + 1)
+    );
   }
 
   private preloadNextBuiltRoom(): void {
     const nextRoomIndex =
       this.roomProgression.currentStep.roomIndex + 1;
 
-    if (!this.isRoomBuilt(nextRoomIndex)) {
+    if (!this.canAdvanceToNextRoom()) {
       return;
     }
 
@@ -815,6 +915,7 @@ export class GameApp {
       gameLoop: this.gameLoop,
       worldCollision: this.worldCollision,
       room: this.room,
+      levelBuilderRooms: LEVEL_BUILDER_ROOMS,
       anomalySystem: this.anomalySystem,
       isGameActive: () => this.gameplayActive,
       getGameState: () => this.gameStateMachine.currentState,
@@ -842,9 +943,98 @@ export class GameApp {
         this.nextRunSeedOverride = seed;
       },
       onLevelBuilderOpen: () => this.hidePointerLockPrompt(),
+      onLevelBuilderRoomChange: (roomIndex) =>
+        this.switchLevelBuilderRoom(roomIndex),
     });
     runtime.setVisible(this.debugVisible);
     return runtime;
+  }
+
+  private switchLevelBuilderRoom(roomIndex: number): Promise<void> {
+    if (roomIndex === this.roomProgression.currentStep.roomIndex) {
+      return Promise.resolve();
+    }
+
+    if (!this.isRoomBuilt(roomIndex)) {
+      return Promise.reject(
+        new RangeError(`Room ${roomIndex + 1} has not been built yet.`),
+      );
+    }
+
+    if (this.levelBuilderRoomChangePromise !== null) {
+      return this.levelBuilderRoomChangePromise;
+    }
+
+    const change = this.performLevelBuilderRoomChange(roomIndex);
+    this.levelBuilderRoomChangePromise = change;
+    const clearPendingChange = (): void => {
+      if (this.levelBuilderRoomChangePromise === change) {
+        this.levelBuilderRoomChangePromise = null;
+      }
+    };
+    void change.then(clearPendingChange, clearPendingChange);
+    return change;
+  }
+
+  private async performLevelBuilderRoomChange(roomIndex: number): Promise<void> {
+    const previousRoom = this.room;
+    const nextRoom = this.createRoom(roomIndex);
+    nextRoom.mount({
+      scene: new THREE.Scene(),
+      worldCollision: new WorldCollision(),
+    });
+
+    try {
+      await nextRoom.loadAssets(this.assetManager);
+    } catch (error: unknown) {
+      nextRoom.unmount();
+      throw error;
+    }
+
+    if (this.destroyed) {
+      nextRoom.unmount();
+      return;
+    }
+
+    this.roomPreloader.cancel();
+    nextRoom.transferMount({
+      scene: this.scene,
+      worldCollision: this.worldCollision,
+    });
+    this.debugRuntime?.dispose();
+    this.debugRuntime = null;
+    this.targetReportHighlight.reset();
+    this.anomalySystem.restore();
+    this.housePressureLighting.release();
+    previousRoom.unmount();
+    this.room = nextRoom;
+    const selectedStep = this.roomProgression.select(roomIndex);
+
+    if (selectedStep.id !== nextRoom.definition.id) {
+      throw new Error(
+        `Escape-route room ${roomIndex + 1} does not match "${nextRoom.definition.id}".`,
+      );
+    }
+
+    this.configureRoomGameplaySystems(nextRoom);
+    this.registerActiveRoomCatalog();
+
+    if (this.runIdentity !== null) {
+      this.prepareActiveRoomBaseline(this.runIdentity.seed);
+    }
+
+    this.housePressureLighting.bind(nextRoom.getVisualRoot(), this.scene);
+    this.applyHousePressure(this.housePressureSystem.getSnapshot());
+    this.resetPlayer();
+    this.rendererManager.invalidateShadows();
+
+    if (this.experienceStarted) {
+      this.storyDirector.leaveRoom();
+      this.storyDirector.enterRoom(nextRoom.definition.id);
+    }
+
+    this.debugRuntime = this.createDebugRuntime();
+    this.debugRuntime?.openLevelBuilder();
   }
 
   private handleDebugVisibilityInput(): void {
@@ -888,8 +1078,9 @@ export class GameApp {
     );
 
     if (
+      (state !== 'search' && state !== 'room-complete') ||
       !this.inputManager.wasActionPressed('interact') ||
-      !this.desktopInput.isPointerLocked()
+      !this.isGameplayInputActive()
     ) {
       return;
     }
@@ -905,13 +1096,12 @@ export class GameApp {
         state === 'room-complete' &&
         this.exitDoorController.getSnapshot().state === 'locked'
       ) {
+        if (this.getPendingStoryExitRequirement() === null) {
+          this.storyDirector.emit({ type: 'room-completed' });
+        }
+
         this.tryUnlockRoomExit();
       }
-      return;
-    }
-
-    if (state === 'observation') {
-      this.lastSelectedTargetId = this.aimedTargetId;
       return;
     }
 
@@ -955,7 +1145,7 @@ export class GameApp {
       targetId === null ||
       this.runIdentity?.mode !== 'story' ||
       !this.storyDirector.getSnapshot().active ||
-      (state !== 'observation' && state !== 'room-complete')
+      state !== 'room-complete'
     ) {
       return null;
     }
@@ -999,16 +1189,6 @@ export class GameApp {
       mode,
       this.room.definition.id,
     );
-  }
-
-  private getStoryObservationInstruction(): string | undefined {
-    if (this.runIdentity?.mode !== 'story') {
-      return undefined;
-    }
-
-    return this.storyInteractionRegistry.getExitRequirement(
-      this.room.definition.id,
-    )?.exitInstruction;
   }
 
   private registerRunError(kind: RunErrorKind): void {
@@ -1064,7 +1244,7 @@ export class GameApp {
     this.storyEffectRuntime.reset();
     this.housePressureSystem.reset();
     this.housePressureView.reset();
-    this.housePressureLighting.bind(this.room.getVisualRoot());
+    this.housePressureLighting.bind(this.room.getVisualRoot(), this.scene);
     this.reportHud.reset();
     this.roomCompleteBanner.reset();
     this.reportSystem.reset();
@@ -1077,6 +1257,8 @@ export class GameApp {
     this.runTimer.reset();
     this.pendingAnomalyPlan = null;
     this.anomalyAppliedDuringBlackout = false;
+    this.rewardedReviveUsed = false;
+    this.failedOutcomeRecordedForRun = false;
     const identityOptions =
       this.nextRunSeedOverride === null
         ? { mode }
@@ -1090,7 +1272,108 @@ export class GameApp {
   }
 
   private async tryAgain(): Promise<void> {
+    this.recordFailedStoryOutcome();
     await this.restartFinishedRun('game-over');
+  }
+
+  private async continueWithRewardedAd(): Promise<boolean> {
+    const adapter = this.platformManager.activeAdapter;
+
+    if (
+      this.destroyed ||
+      this.gameStateMachine.currentState !== 'game-over' ||
+      this.rewardedReviveUsed ||
+      !adapter.isRewardedAdAvailable()
+    ) {
+      return false;
+    }
+
+    const wasMuted = this.audioManager.getSnapshot().muted;
+    let adMutedAudio = false;
+    const restoreAudio = (): void => {
+      if (!adMutedAudio) {
+        return;
+      }
+
+      adMutedAudio = false;
+      this.audioManager.setMuted(wasMuted);
+      adapter.setAudioMuted(wasMuted);
+    };
+    let rewardGranted: boolean;
+
+    try {
+      rewardGranted = await adapter.requestRewardedAd({
+        onStarted: () => {
+          adMutedAudio = true;
+          this.audioManager.setMuted(true);
+          adapter.setAudioMuted(true);
+        },
+        onEnded: restoreAudio,
+      });
+    } finally {
+      restoreAudio();
+    }
+
+    if (
+      !rewardGranted ||
+      this.destroyed ||
+      this.gameStateMachine.currentState !== 'game-over'
+    ) {
+      return false;
+    }
+
+    this.rewardedReviveUsed = true;
+    await this.reviveCurrentRoom();
+    return true;
+  }
+
+  private async reviveCurrentRoom(): Promise<void> {
+    const runIdentity = this.runIdentity;
+
+    if (runIdentity === null || !this.runTimer.continueFinishedRun()) {
+      throw new Error('A finished run is required for a rewarded revive.');
+    }
+
+    this.targetReportHighlight.reset();
+    this.gameOverRevealTarget = null;
+    this.anomalySystem.restore();
+    this.reportHud.reset();
+    this.roomCompleteBanner.reset();
+    this.blackoutTimeline.reset();
+    this.blackoutView.reset();
+    this.storyEffectRuntime.reset();
+    const errors = this.runErrorTracker.grantExtraLife();
+    this.storyDirector.setPressureLevel(errors.errorCount);
+    this.storyDirector.enterRoom(this.room.definition.id);
+    const pressure = this.housePressureSystem.setPressureLevel(
+      errors.errorCount,
+    );
+    this.housePressureView.reset();
+    this.housePressureLighting.bind(this.room.getVisualRoot(), this.scene);
+    this.applyHousePressure(pressure);
+    const reviveSeed = deriveRoomSeed(
+      runIdentity.seed,
+      this.roomProgression.currentStep.roomIndex,
+      `${this.room.definition.id}:rewarded-revive`,
+    );
+    this.prepareActiveRoomBaseline(reviveSeed);
+    this.resetPlayer();
+    this.rendererManager.resize();
+    this.gameStateMachine.transitionTo('room-intro');
+    this.setGameplayActive(true);
+    await Promise.all([this.unlockAudio(), this.requestPointerLock()]);
+  }
+
+  private recordFailedStoryOutcome(): void {
+    if (
+      this.failedOutcomeRecordedForRun ||
+      this.runIdentity?.mode !== 'story'
+    ) {
+      return;
+    }
+
+    this.failedOutcomeRecordedForRun = true;
+    this.storyProgress.recordLoopOutcome('failed');
   }
 
   private async playAgain(): Promise<void> {
@@ -1243,6 +1526,8 @@ export class GameApp {
   private prepareAnomalyBaseline(runSeed: number): void {
     const requiredVisibleTargetIds =
       this.getStoryRequiredVisibleTargetIds();
+    const disappearanceProtectedTargetIds =
+      this.getStoryDisappearanceProtectedTargetIds();
     this.anomalySystem.prepareRunBaseline({
       runSeed,
       roomIndex: this.roomProgression.currentStep.roomIndex,
@@ -1250,6 +1535,9 @@ export class GameApp {
       ...(requiredVisibleTargetIds.length === 0
         ? {}
         : { requiredVisibleTargetIds }),
+      ...(disappearanceProtectedTargetIds.length === 0
+        ? {}
+        : { disappearanceProtectedTargetIds }),
     });
   }
 
@@ -1259,6 +1547,23 @@ export class GameApp {
     }
 
     return this.room.getAnomalyTargets().map(({ id }) => id);
+  }
+
+  private getStoryDisappearanceProtectedTargetIds(): readonly string[] {
+    if (this.runIdentity?.mode !== 'story') {
+      return [];
+    }
+
+    const roomId = this.room.definition.id;
+    const authoredTargetIds = STORY_DISAPPEARANCE_PROTECTED_TARGET_IDS_BY_ROOM[
+      roomId as keyof typeof STORY_DISAPPEARANCE_PROTECTED_TARGET_IDS_BY_ROOM
+    ] ?? [];
+    const requiredTargetId = this.storyInteractionRegistry
+      .getExitRequirement(roomId)?.targetId;
+
+    return requiredTargetId === undefined
+      ? authoredTargetIds
+      : [...new Set([...authoredTargetIds, requiredTargetId])];
   }
 
   private updateBlackout(): void {
@@ -1297,6 +1602,14 @@ export class GameApp {
   }
 
   private async requestPointerLock(): Promise<void> {
+    if (this.touchInput.isSupported) {
+      this.hidePointerLockPrompt();
+      this.resumeGameplayState();
+      this.setGameplayActive(true);
+      this.elements.canvas.focus({ preventScroll: true });
+      return;
+    }
+
     try {
       await this.desktopInput.requestPointerLock();
     } catch (error: unknown) {
@@ -1323,6 +1636,8 @@ export class GameApp {
   }
 
   private setGameplayActive(active: boolean): void {
+    this.touchInput.setGameplayActive(active);
+
     if (this.gameplayActive === active) {
       return;
     }
@@ -1354,6 +1669,17 @@ export class GameApp {
     this.pauseScreen.setBusy(true);
     void this.unlockAudio();
     void this.requestPointerLock();
+  };
+
+  private readonly handleTouchPause = (): void => {
+    if (!this.touchInput.isActive) {
+      return;
+    }
+
+    this.inputManager.reset();
+    this.gameStateMachine.pause();
+    this.setGameplayActive(false);
+    this.showPointerLockPrompt(POINTER_LOCK_COPY.touchResume);
   };
 
   private readonly handleOpenNotebookFromMenu = (): void => {
@@ -1429,6 +1755,10 @@ export class GameApp {
     }
   }
 
+  private isGameplayInputActive(): boolean {
+    return this.desktopInput.isPointerLocked() || this.touchInput.isActive;
+  }
+
   private readonly handleGameStateTransition = (
     transition: GameStateTransition,
   ): void => {
@@ -1490,13 +1820,17 @@ export class GameApp {
         this.storyEffectRuntime.reset();
         this.runTimer.clearPhase();
         this.blackoutTimeline.start();
-        this.blackoutView.begin(this.room.getVisualRoot());
+        this.blackoutView.begin(this.room.getVisualRoot(), this.scene);
         this.roomAudioDirector.beginBlackout();
         break;
       case 'room-complete':
         this.storyDirector.startPhase('room-complete');
-        this.storyDirector.emit({ type: 'room-completed' });
         this.runTimer.clearPhase();
+
+        if (this.getPendingStoryExitRequirement() === null) {
+          this.storyDirector.emit({ type: 'room-completed' });
+        }
+
         this.tryUnlockRoomExit();
         break;
       case 'search':
@@ -1530,10 +1864,6 @@ export class GameApp {
         this.housePressureView.reset();
         this.housePressureLighting.release();
         this.storyDirector.emit({ type: 'loop-failed' });
-
-        if (this.runIdentity?.mode === 'story') {
-          this.storyProgress.recordLoopOutcome('failed');
-        }
 
         this.storyEffectRuntime.reset();
         this.roomCompleteBanner.reset();
@@ -1573,6 +1903,9 @@ export class GameApp {
           errorCount: errors.errorCount,
           maximumErrors: errors.maximumErrors,
           missedAnomaly,
+          rewardedContinueAvailable:
+            !this.rewardedReviveUsed &&
+            this.platformManager.activeAdapter.isRewardedAdAvailable(),
         });
         this.roomAudioDirector.finishRoom();
         this.setGameplayActive(false);
@@ -1586,9 +1919,15 @@ export class GameApp {
         this.storyDirector.emit({ type: 'chapter-completed' });
         this.storyEffectRuntime.reset();
 
+        let storyOutcome: StoryChapterOutcome | undefined;
+
         if (this.runIdentity?.mode === 'story') {
+          storyOutcome = resolveFirstChapterOutcome(
+            this.storyProgress.getSnapshot().fragments,
+          );
           this.storyProgress.recordLoopOutcome('completed');
           this.storyProgress.addChapterOutcome('chapter-one-complete');
+          this.storyProgress.addChapterOutcome(storyOutcome);
           this.storySaveRepository.unlockEscape();
           this.startScreen.setEscapeUnlocked(true);
         }
@@ -1602,6 +1941,7 @@ export class GameApp {
           timing,
           errorCount: errors.errorCount,
           maximumErrors: errors.maximumErrors,
+          ...(storyOutcome === undefined ? {} : { storyOutcome }),
         });
         this.roomAudioDirector.finishRoom();
         this.setGameplayActive(false);
@@ -1619,6 +1959,7 @@ export class GameApp {
       case 'main-menu':
         this.storyDirector.stop();
         this.storyEffectRuntime.reset();
+        this.rendererManager.setAtmosphereProfile(0, 0);
         this.housePressureSystem.reset();
         this.housePressureView.reset();
         this.housePressureLighting.release();

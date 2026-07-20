@@ -95,6 +95,17 @@ export class RunTimer {
     return true;
   }
 
+  public continueFinishedRun(): boolean {
+    if (!this.started || this.running || !this.finished) {
+      return false;
+    }
+
+    this.finished = false;
+    this.activeSegmentStartedAtMs = this.readNow();
+    this.running = true;
+    return true;
+  }
+
   public stop(): boolean {
     if (!this.started || this.finished) {
       return false;

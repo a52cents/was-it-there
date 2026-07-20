@@ -1,4 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
+import {
+  FIRST_STORY_CHAPTER_FINAL_ROOM_ID,
+  isFirstStoryChapterFinalRoom,
+  resolveFirstChapterOutcome,
+} from '../../src/gameplay/story/StoryChapterOutcome';
 import { StoryProgress } from '../../src/gameplay/story/StoryProgress';
 
 describe('StoryProgress', () => {
@@ -71,5 +76,29 @@ describe('StoryProgress', () => {
       chapterOutcomeIds: ['chapter-one-complete'],
     });
     expect(progress.wasEventTriggeredThisLoop('bedroom-radio')).toBe(false);
+  });
+
+  it('resolves the first chapter from the four core memories', () => {
+    expect(
+      resolveFirstChapterOutcome([
+        'memory-empty-place',
+        'memory-mirror-warning',
+        'memory-phone-prediction',
+      ]),
+    ).toBe('chapter-escaped');
+    expect(
+      resolveFirstChapterOutcome([
+        'memory-empty-place',
+        'memory-mirror-warning',
+        'memory-phone-prediction',
+        'memory-erased-name',
+      ]),
+    ).toBe('chapter-remembered');
+  });
+
+  it('continues Story through the office and ends the chapter in the kitchen', () => {
+    expect(isFirstStoryChapterFinalRoom('office')).toBe(false);
+    expect(isFirstStoryChapterFinalRoom('kitchen')).toBe(true);
+    expect(FIRST_STORY_CHAPTER_FINAL_ROOM_ID).toBe('kitchen');
   });
 });

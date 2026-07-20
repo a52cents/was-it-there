@@ -11,6 +11,7 @@ describe('StandaloneAdapter', () => {
   it('reports that rewarded ads are unavailable', async () => {
     const adapter = new StandaloneAdapter(() => undefined);
 
+    expect(adapter.isRewardedAdAvailable()).toBe(false);
     await expect(adapter.requestRewardedAd()).resolves.toBe(false);
   });
 

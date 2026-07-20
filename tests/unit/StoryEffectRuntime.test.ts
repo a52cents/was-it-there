@@ -116,7 +116,7 @@ describe('StoryEffectRuntime', () => {
     expect(subtitle.update).toHaveBeenCalledWith(16);
     expect(subtitle.pause).toHaveBeenCalledOnce();
     expect(memory.resume).toHaveBeenCalledOnce();
-    expect(audio.stop).toHaveBeenCalledTimes(10);
+    expect(audio.stop).toHaveBeenCalledTimes(17);
     expect(subtitle.reset).toHaveBeenCalledOnce();
     expect(memory.reset).toHaveBeenCalledOnce();
   });
@@ -133,18 +133,18 @@ describe('StoryEffectRuntime', () => {
     runtime.execute(
       createExecution({
         type: 'helper-visibility',
-        bindingId: 'bathroom-mirror-fog',
+        bindingId: 'story-room-helper',
         visible: true,
       }),
     );
     expect(helperVisibility).toHaveBeenLastCalledWith(
-      'bathroom-mirror-fog',
+      'story-room-helper',
       true,
     );
 
     runtime.reset();
     expect(helperVisibility).toHaveBeenLastCalledWith(
-      'bathroom-mirror-fog',
+      'story-room-helper',
       false,
     );
   });

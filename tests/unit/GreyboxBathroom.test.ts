@@ -104,9 +104,9 @@ describe('GreyboxBathroom', () => {
     const upperWall = room.getVisualRoot().getObjectByName(
       'WALL_North',
     ) as THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial> | undefined;
-    expect(ambient?.intensity).toBeGreaterThanOrEqual(0.65);
-    expect(hemisphere?.intensity).toBeGreaterThanOrEqual(1.1);
-    expect(roomFill?.intensity).toBeGreaterThanOrEqual(1);
+    expect(ambient?.intensity).toBeCloseTo(0.12);
+    expect(hemisphere?.intensity).toBeCloseTo(0.4);
+    expect(roomFill?.intensity).toBeCloseTo(0.45);
     expect(upperWall?.material.color.getHex()).toBe(0x687a7d);
 
     const spawn = room.getPlayerSpawn();
@@ -193,19 +193,6 @@ describe('GreyboxBathroom', () => {
         ?.object.quaternion.toArray(),
     ).toEqual([0, 0.9990482215818578, 0, 0.04361938736533601]);
 
-    expect(room.isStoryMirrorFogVisible()).toBe(false);
-    expect(room.setStoryMirrorFogVisible(true)).toBe(true);
-    const mirrorFog = room
-      .getAnomalyTargetRegistry()
-      .getById('mirror')
-      ?.object.getObjectByName('STORY_BathroomMirrorFog');
-    expect(mirrorFog).toBeDefined();
-    expect(mirrorFog?.visible).toBe(true);
-    expect(mirrorFog?.layers.isEnabled(RENDER_LAYERS.scene)).toBe(true);
-    expect(mirrorFog?.layers.isEnabled(RENDER_LAYERS.interaction)).toBe(false);
-    expect(room.setStoryMirrorFogVisible(false)).toBe(true);
-    expect(room.isStoryMirrorFogVisible()).toBe(false);
-
     for (const targetId of ['vanity', 'toilet'] as const) {
       const target = room.getAnomalyTargetRegistry().getById(targetId);
       const model = target?.object.getObjectByName(
@@ -220,31 +207,10 @@ describe('GreyboxBathroom', () => {
       expect(bounds.min.y).toBeCloseTo(target.object.position.y);
     }
 
-    for (const targetId of [
-      'bin',
-      'plant',
-      'soap-dish',
-      'slippers',
-      'toothbrush-cup',
-      'toilet-roll-holder',
-      'toilet-rolls',
-    ]) {
+    for (const target of room.getAnomalyTargets()) {
       expect(
-        room
-          .getAnomalyTargetRegistry()
-          .getById(targetId)
-          ?.variants.some((variant) => variant.kind === 'rotate'),
-        targetId,
-      ).toBe(false);
-    }
-
-    for (const targetId of ['towel', 'towels-stacked']) {
-      expect(
-        room
-          .getAnomalyTargetRegistry()
-          .getById(targetId)
-          ?.variants.some((variant) => variant.kind === 'rotate'),
-        targetId,
+        target.variants.some((variant) => variant.kind === 'rotate'),
+        target.id,
       ).toBe(false);
     }
 

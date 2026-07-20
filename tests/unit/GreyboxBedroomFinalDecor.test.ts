@@ -77,17 +77,6 @@ const SUPPLEMENTARY_TARGET_IDS = [
   'photo-frame',
 ] as const;
 
-const ROTATABLE_TARGET_IDS = new Set([
-  'television',
-  'chair',
-  'picture',
-  'books',
-  'nightstand',
-  'rug',
-  'radio',
-  'photo-frame',
-]);
-
 function createSource(url: string): THREE.Group {
   const materialNames = MATERIAL_NAMES_BY_URL.get(url);
 
@@ -212,7 +201,6 @@ describe('GreyboxBedroom final decor', () => {
     );
 
     for (const target of room.getAnomalyTargets()) {
-      const rotationsExpected = ROTATABLE_TARGET_IDS.has(target.id);
       const hideVariants = target.variants.filter(
         (variant) => variant.kind === 'hide',
       );
@@ -232,23 +220,13 @@ describe('GreyboxBedroom final decor', () => {
       expect(target.allowedKinds, target.id).toEqual([
         'hide',
         'show',
-        ...(rotationsExpected ? ['rotate' as const] : []),
         'color',
       ]);
       expect(hideVariants, target.id).toHaveLength(1);
       expect(showVariants, target.id).toHaveLength(1);
       expect(moveVariants, target.id).toHaveLength(0);
       expect(colorVariants, target.id).toHaveLength(2);
-      expect(rotateVariants, target.id).toHaveLength(
-        rotationsExpected ? 2 : 0,
-      );
-
-      for (const variant of rotateVariants) {
-        expect(
-          Math.max(...variant.rotationOffsetRadians.map(Math.abs)),
-          target.id,
-        ).toBeCloseTo(Math.PI / 6);
-      }
+      expect(rotateVariants, target.id).toHaveLength(0);
 
       const colors = colorVariants.map((variant) => variant.color);
       expect(new Set(colors).size, target.id).toBe(2);
@@ -259,7 +237,7 @@ describe('GreyboxBedroom final decor', () => {
         (count, target) => count + target.variants.length,
         0,
       ),
-    ).toBe(72);
+    ).toBe(56);
 
     const plan = system.generatePlan({
       runSeed: 321,

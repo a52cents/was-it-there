@@ -21,6 +21,7 @@ import type { PlayableRoom } from '../world/rooms/PlayableRoom';
 import type { WorldCollision } from '../world/WorldCollision';
 import type { DebugSnapshot } from './DebugSnapshot';
 import { LevelBuilderRuntime } from './level-builder/LevelBuilderRuntime';
+import type { LevelBuilderRoomOption } from './level-builder/LevelBuilderPanel';
 
 type CapsuleDebugMesh = THREE.LineLoop<
   THREE.BufferGeometry,
@@ -39,6 +40,7 @@ export interface GreyboxDebugRuntimeOptions {
   readonly gameLoop: GameLoop;
   readonly worldCollision: WorldCollision;
   readonly room: PlayableRoom;
+  readonly levelBuilderRooms: readonly LevelBuilderRoomOption[];
   readonly anomalySystem: RoomAnomalySystem;
   readonly isGameActive: () => boolean;
   readonly getGameState: () => GameState;
@@ -57,6 +59,7 @@ export interface GreyboxDebugRuntimeOptions {
   readonly setMusicVolume: (volume: number) => void;
   readonly setNextRunSeed: (seed: number) => void;
   readonly onLevelBuilderOpen: () => void;
+  readonly onLevelBuilderRoomChange: (roomIndex: number) => Promise<void>;
 }
 
 export class GreyboxDebugRuntime {
@@ -80,6 +83,7 @@ export class GreyboxDebugRuntime {
       panelRoot: options.hudLayer,
       roomId: options.room.definition.id,
       roomRoot: options.room.getVisualRoot(),
+      rooms: options.levelBuilderRooms,
       anomalyTargets: options.room.getAnomalyTargetRegistry(),
       gameLoop: options.gameLoop,
       onOpen: () => {
@@ -107,6 +111,7 @@ export class GreyboxDebugRuntime {
           );
         }
       },
+      onRoomChange: options.onLevelBuilderRoomChange,
       onObjectChanged: () => options.rendererManager.invalidateShadows(),
     });
     this.panel = new InputDebugPanel(options.hudLayer, options.camera, {
@@ -153,6 +158,10 @@ export class GreyboxDebugRuntime {
 
   public isLevelBuilderOpen(): boolean {
     return this.levelBuilder.isOpen();
+  }
+
+  public openLevelBuilder(): void {
+    this.levelBuilder.open();
   }
 
   public isVisible(): boolean {

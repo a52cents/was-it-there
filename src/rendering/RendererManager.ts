@@ -15,6 +15,9 @@ const CAMERA_CUT_ANGLE = 0.8;
 const ROOM_COLOR_GRADE_SHADER = {
   uniforms: {
     tDiffuse: { value: null },
+    atmosphereTime: { value: 0 },
+    atmosphereStress: { value: 0 },
+    atmosphereCalmPulse: { value: 0 },
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
@@ -26,23 +29,72 @@ const ROOM_COLOR_GRADE_SHADER = {
   `,
   fragmentShader: /* glsl */ `
     uniform sampler2D tDiffuse;
+    uniform float atmosphereTime;
+    uniform float atmosphereStress;
+    uniform float atmosphereCalmPulse;
 
     varying vec2 vUv;
 
+    float atmosphereNoise(vec2 position) {
+      return fract(
+        sin(dot(position, vec2(12.9898, 78.233))) * 43758.5453
+      );
+    }
+
     void main() {
       vec4 texel = texture2D(tDiffuse, vUv);
-      float luminance = dot(texel.rgb, vec3(0.2126, 0.7152, 0.0722));
-      vec3 color = mix(vec3(luminance), texel.rgb, 1.035);
+      vec2 centeredUv = vUv - 0.5;
+      float edgeDistance = length(centeredUv);
+      float edgeMask = smoothstep(0.18, 0.72, edgeDistance);
+      vec3 sampledColor = texel.rgb;
+
+      if (atmosphereStress > 0.01) {
+        vec2 edgeDirection = centeredUv / max(edgeDistance, 0.001);
+        float aberrationPulse = 0.82 + sin(atmosphereTime * 0.71) * 0.18;
+        vec2 colorOffset = edgeDirection * edgeMask
+          * atmosphereStress * 0.0011 * aberrationPulse;
+        sampledColor.r = texture2D(
+          tDiffuse,
+          clamp(vUv + colorOffset, vec2(0.0), vec2(1.0))
+        ).r;
+        sampledColor.b = texture2D(
+          tDiffuse,
+          clamp(vUv - colorOffset, vec2(0.0), vec2(1.0))
+        ).b;
+      }
+
+      float luminance = dot(sampledColor, vec3(0.2126, 0.7152, 0.0722));
+      float saturation = 0.99 - atmosphereStress * 0.055;
+      vec3 color = mix(vec3(luminance), sampledColor, saturation);
 
       float highlightMix = smoothstep(0.18, 1.1, luminance);
-      vec3 shadowTint = vec3(0.965, 0.985, 1.035);
-      vec3 highlightTint = vec3(1.03, 1.005, 0.965);
+      vec3 shadowTint = mix(
+        vec3(0.965, 0.955, 0.94),
+        vec3(0.89, 0.96, 1.08),
+        atmosphereStress * 0.58
+      );
+      vec3 highlightTint = vec3(1.045, 1.005, 0.94)
+        + vec3(0.012, 0.006, -0.004) * atmosphereCalmPulse;
       color *= mix(shadowTint, highlightTint, highlightMix);
-      color = (color - 0.5) * 1.025 + 0.5;
+      color = (color - 0.5) * 1.02 + 0.5;
 
-      vec2 centeredUv = vUv - 0.5;
-      float vignette = smoothstep(0.4, 0.82, length(centeredUv));
-      color *= 1.0 - vignette * 0.075;
+      float vignette = smoothstep(0.32, 0.78, length(centeredUv));
+      float breathing = 0.5 + sin(atmosphereTime * 0.62) * 0.5;
+      float vignetteStrength = 0.1
+        + atmosphereStress * (0.055 + breathing * 0.026)
+        - atmosphereCalmPulse * 0.01;
+      color *= 1.0 - vignette * vignetteStrength;
+
+      float flickerNoise = atmosphereNoise(
+        vec2(floor(atmosphereTime * 3.0), 19.17)
+      );
+      float flickerWave = 0.5 + sin(atmosphereTime * 1.47) * 0.5;
+      float flickerStrength = 0.002 + atmosphereStress * 0.0065;
+      color *= 1.0 - flickerNoise * flickerWave * flickerStrength;
+
+      float grainFrame = floor(atmosphereTime * 24.0);
+      float grain = atmosphereNoise(gl_FragCoord.xy + grainFrame) - 0.5;
+      color += grain * (0.0035 + atmosphereStress * 0.006);
 
       gl_FragColor = vec4(max(color, 0.0), texel.a);
     }
@@ -60,8 +112,11 @@ export class RendererManager {
   private readonly previousCameraQuaternion = new THREE.Quaternion();
   private composer: EffectComposer | null = null;
   private motionBlurPass: AfterimagePass | null = null;
+  private atmospherePass: ShaderPass | null = null;
   private hasPreviousCameraTransform = false;
   private motionBlurPrimed = false;
+  private atmosphereStress = 0;
+  private atmosphereCalmPulse = 0;
   private lastWidth = 0;
   private lastHeight = 0;
   private lastPixelRatio = 0;
@@ -77,7 +132,7 @@ export class RendererManager {
     });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 0.95;
+    this.renderer.toneMappingExposure = 1;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.shadowMap.autoUpdate = false;
@@ -129,12 +184,18 @@ export class RendererManager {
     const composer = this.ensurePostProcessing(scene, camera);
 
     this.updateMotionBlur(camera);
+    this.updateAtmospherePass();
     this.renderer.info.reset();
     composer.render();
   }
 
   public invalidateShadows(): void {
     this.renderer.shadowMap.needsUpdate = true;
+  }
+
+  public setAtmosphereProfile(stress: number, calmPulse: number): void {
+    this.atmosphereStress = normalizeAtmosphereAmount(stress);
+    this.atmosphereCalmPulse = normalizeAtmosphereAmount(calmPulse);
   }
 
   public getStats(): RendererStats {
@@ -150,6 +211,7 @@ export class RendererManager {
     this.composer?.dispose();
     this.composer = null;
     this.motionBlurPass = null;
+    this.atmospherePass = null;
     this.renderer.dispose();
   }
 
@@ -177,7 +239,32 @@ export class RendererManager {
     composer.addPass(outputPass);
     this.composer = composer;
     this.motionBlurPass = motionBlurPass;
+    this.atmospherePass = colorGradePass;
     return composer;
+  }
+
+  private updateAtmospherePass(): void {
+    const pass = this.atmospherePass;
+
+    if (pass === null) {
+      return;
+    }
+
+    const timeUniform = pass.uniforms['atmosphereTime'];
+    const stressUniform = pass.uniforms['atmosphereStress'];
+    const calmPulseUniform = pass.uniforms['atmosphereCalmPulse'];
+
+    if (
+      timeUniform === undefined ||
+      stressUniform === undefined ||
+      calmPulseUniform === undefined
+    ) {
+      throw new Error('The atmosphere shader uniforms are incomplete.');
+    }
+
+    timeUniform.value = performance.now() / 1_000;
+    stressUniform.value = this.atmosphereStress;
+    calmPulseUniform.value = this.atmosphereCalmPulse;
   }
 
   private updateMotionBlur(camera: THREE.Camera): void {
@@ -239,4 +326,10 @@ export class RendererManager {
   private readonly handleWindowResize = (): void => {
     this.resize();
   };
+}
+
+function normalizeAtmosphereAmount(value: number): number {
+  return Number.isFinite(value)
+    ? THREE.MathUtils.clamp(value, 0, 1)
+    : 0;
 }

@@ -20,6 +20,13 @@ export const STORY_AUDIO_CUE_IDS = [
   'story-corridor-ring',
   'story-corridor-prediction',
   'story-corridor-failure',
+  'story-office-radio-pattern',
+  'story-office-radio-silence',
+  'story-office-erased-name',
+  'story-office-failure',
+  'story-kitchen-reverse-breakfast',
+  'story-kitchen-chair-scrape',
+  'story-kitchen-failure',
 ] as const;
 
 export type StoryAudioCueId = (typeof STORY_AUDIO_CUE_IDS)[number];
@@ -319,6 +326,83 @@ export class AudioManager {
           endFrequency: 74,
           durationSeconds: 3.05,
           maximumVolume: 0.022,
+        });
+        break;
+      case 'story-office-radio-pattern':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'triangle',
+          startFrequency: 304,
+          endFrequency: 608,
+          durationSeconds: 2.4,
+          maximumVolume: 0.018,
+        });
+        break;
+      case 'story-office-radio-silence':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'square',
+          startFrequency: 1_216,
+          endFrequency: 38,
+          durationSeconds: 0.09,
+          maximumVolume: 0.022,
+        });
+        break;
+      case 'story-office-erased-name':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'sine',
+          startFrequency: 304,
+          endFrequency: 76,
+          durationSeconds: 2.4,
+          maximumVolume: 0.024,
+        });
+        break;
+      case 'story-office-failure':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'sawtooth',
+          startFrequency: 304,
+          endFrequency: 30.4,
+          durationSeconds: 3.04,
+          maximumVolume: 0.018,
+        });
+        break;
+      case 'story-kitchen-reverse-breakfast':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'square',
+          startFrequency: 980,
+          endFrequency: 620,
+          durationSeconds: 0.54,
+          maximumVolume: 0.016,
+        });
+        break;
+      case 'story-kitchen-chair-scrape':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'sawtooth',
+          startFrequency: 132,
+          endFrequency: 43,
+          durationSeconds: 0.82,
+          maximumVolume: 0.014,
+        });
+        break;
+      case 'story-kitchen-failure':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'sawtooth',
+          startFrequency: 912,
+          endFrequency: 30.4,
+          durationSeconds: 3.04,
+          maximumVolume: 0.018,
         });
         break;
       case 'door-unlock':

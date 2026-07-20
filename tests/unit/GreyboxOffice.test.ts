@@ -6,6 +6,7 @@ import type { AnomalyPlan } from '../../src/gameplay/anomalies/AnomalyGenerator'
 import { RoomAnomalySystem } from '../../src/gameplay/anomalies/RoomAnomalySystem';
 import type { PreparedAnomalyVariant } from '../../src/gameplay/anomalies/AnomalyTarget';
 import { PLAYER_CONFIG } from '../../src/player/PlayerConfig';
+import { AnomalyTargetSelector } from '../../src/gameplay/interaction/AnomalyTargetSelector';
 import { RENDER_LAYERS } from '../../src/rendering/RenderLayers';
 import { AssetManager } from '../../src/world/assets/AssetManager';
 import {
@@ -128,6 +129,64 @@ describe('GreyboxOffice', () => {
       new Set(room.getAnomalyTargets().map(({ id }) => id)).size,
     ).toBe(18);
 
+    const expectedPositions = {
+      'archive-box': [3.55, 0, 2.8],
+      'bay-armchair': [0.2, 0, 1.45],
+      'bay-plant': [-1.5, 0, -4.05],
+      'bay-rug': [0, 0.012, -2.55],
+      bookcase: [-3.62, 0, -1.38],
+      books: [0.3, 0.94, -0.2],
+      desk: [0.25, 0, -0.35],
+      'desk-lamp': [-0.25, 0.95, -0.2],
+      'desk-photo': [0.12, 0.97, -0.17],
+      'drawer-cabinet': [3.48, 0, -0.72],
+      'filing-cabinet': [3.55, 0, -2.24],
+      'frame-east': [4.08, 1.55, -0.08],
+      'frame-west': [-4.08, 1.72, 0.92],
+      'office-chair': [0.25, 0, -1.05],
+      'office-phone': [0.78, 0.93, -0.2],
+      radio: [-3.58, 0.9, -1.68],
+      speaker: [-3.58, 0.9, -1.15],
+      'wall-clock': [-4.08, 1.86, -0.52],
+    } as const;
+
+    for (const [targetId, position] of Object.entries(expectedPositions)) {
+      expect(
+        room.getAnomalyTargetRegistry().getById(targetId)?.object.position.toArray(),
+        targetId,
+      ).toEqual(position);
+    }
+
+    expect(
+      room.getAnomalyTargetRegistry().getById('desk')?.object.quaternion.toArray(),
+    ).toEqual([0, 1, 0, 0]);
+    expect(
+      room.getAnomalyTargetRegistry().getById('desk')?.object.scale.toArray(),
+    ).toEqual([1.15, 1.15, 1.15]);
+    expect(
+      room.getAnomalyTargetRegistry().getById('office-chair')?.object.scale.toArray(),
+    ).toEqual([1.25, 1.25, 1.25]);
+    expect(
+      room.getAnomalyTargetRegistry().getById('office-phone')?.object.scale.toArray(),
+    ).toEqual([1.15, 1.15, 1.15]);
+    expect(
+      room.getAnomalyTargetRegistry().getById('wall-clock')?.object.scale.toArray(),
+    ).toEqual([4.2, 4.2, 4.2]);
+    expect(
+      room
+        .getAnomalyTargetRegistry()
+        .getById('wall-clock')
+        ?.object.getObjectByName('STORY_OfficeClock_0304'),
+    ).toBeDefined();
+
+    const plantCopy = room
+      .getVisualRoot()
+      .getObjectByName('ANOM_Office_BayPlant_Copy');
+    expect(plantCopy?.position.toArray()).toEqual([1.5, 0, -4.05]);
+    expect(
+      plantCopy?.getObjectByName('INTERACT_bay-plant'),
+    ).toBeUndefined();
+
     for (const target of room.getAnomalyTargets()) {
       expect(target.object.parent).toBe(room.getVisualRoot());
       expect(target.interactionVolume.parent).toBe(target.object);
@@ -139,7 +198,9 @@ describe('GreyboxOffice', () => {
       expect(
         target.variants.filter(({ kind }) => kind === 'color'),
       ).toHaveLength(2);
-      expect(target.variants.some(({ kind }) => kind === 'hide')).toBe(true);
+      expect(target.variants.some(({ kind }) => kind === 'hide')).toBe(
+        target.id !== 'desk-photo',
+      );
       expect(target.variants.some(({ kind }) => kind === 'show')).toBe(true);
     }
 
@@ -167,29 +228,41 @@ describe('GreyboxOffice', () => {
       ).toHaveLength(1);
     }
 
-    const positiveRotation = (targetId: string) =>
-      room
-        .getAnomalyTargetRegistry()
-        .getById(targetId)
-        ?.variants.find(
-          ({ id, kind }) =>
-            kind === 'rotate' &&
-            (id === 'turned-left' || id === 'tilted-left'),
-        );
-    expect(positiveRotation('office-chair')).toMatchObject({
-      rotationOffsetRadians: [0, Math.PI / 6, 0],
-    });
-    expect(positiveRotation('frame-east')).toMatchObject({
-      rotationOffsetRadians: [Math.PI / 12, 0, 0],
-    });
-
-    for (const targetId of [
-      'filing-cabinet',
-      'bay-plant',
-      'wall-clock',
-    ]) {
-      expect(positiveRotation(targetId), targetId).toBeUndefined();
+    for (const target of room.getAnomalyTargets()) {
+      expect(
+        target.variants.some(({ kind }) => kind === 'rotate'),
+        target.id,
+      ).toBe(false);
     }
+
+    const deskPhoto = room.getAnomalyTargetRegistry().getById('desk-photo');
+    expect(deskPhoto?.variants.some(({ kind }) => kind === 'hide')).toBe(false);
+    deskPhoto?.interactionVolume.geometry.computeBoundingBox();
+    const photoInteractionSize = deskPhoto?.interactionVolume.geometry
+      .boundingBox?.getSize(new THREE.Vector3());
+    expect(photoInteractionSize?.x).toBeCloseTo(0.46);
+    expect(photoInteractionSize?.y).toBeCloseTo(0.58);
+    expect(photoInteractionSize?.z).toBeCloseTo(0.3);
+
+    const deskCollider = room
+      .getCollisionRoot()
+      .getObjectByName('COLLIDER_OfficeDesk') as THREE.Mesh;
+    deskCollider.geometry.computeBoundingBox();
+    const deskColliderSize = deskCollider.geometry.boundingBox?.getSize(
+      new THREE.Vector3(),
+    );
+    expect(deskColliderSize?.x).toBeCloseTo(1.45);
+    expect(deskColliderSize?.y).toBeCloseTo(0.943);
+    expect(deskColliderSize?.z).toBeCloseTo(0.68);
+
+    const camera = new THREE.PerspectiveCamera(65, 16 / 9, 0.05, 50);
+    camera.position.set(0, 1.6, 1.4);
+    camera.lookAt(0.12, 1.16, -0.17);
+    camera.updateMatrixWorld(true);
+    expect(
+      new AnomalyTargetSelector(room.getAnomalyTargetRegistry())
+        .getTargetAtScreenCenter(camera)?.id,
+    ).toBe('desk-photo');
 
     const system = new RoomAnomalySystem(
       room.getAnomalyTargetRegistry(),

@@ -56,6 +56,29 @@ describe('StorySaveRepository', () => {
     });
   });
 
+  it('migrates legacy 317 easter-egg discoveries to the 304 anchor', () => {
+    const storage = new MemoryStorage();
+    storage.values.set(
+      STORY_SAVE_STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        escapeUnlocked: false,
+        progress: {
+          ...createEmptyStoryProgress(),
+          discoveries: [
+            'bedroom-page-317',
+            'bathroom-duck-317',
+            'bedroom-page-304',
+          ],
+        },
+      }),
+    );
+
+    expect(
+      new StorySaveRepository(storage).load().progress.discoveries,
+    ).toEqual(['bathroom-duck-304', 'bedroom-page-304']);
+  });
+
   it('erases Story discoveries while preserving Escape access', () => {
     const storage = new MemoryStorage();
     const repository = new StorySaveRepository(storage);

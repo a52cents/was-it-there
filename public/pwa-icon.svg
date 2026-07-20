@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Was It There?">
+  <rect width="512" height="512" fill="#050605"/>
+  <rect x="54" y="54" width="404" height="404" fill="#0d0e0c" stroke="#d8b365" stroke-width="8"/>
+  <path d="M154 402V148h204v254" fill="#090a0c" stroke="#eee9df" stroke-width="10"/>
+  <path d="M256 148v254" stroke="#d8b365" stroke-width="4" opacity=".35"/>
+  <circle cx="322" cy="276" r="10" fill="#f0d48d"/>
+  <text x="256" y="117" fill="#d8b365" font-family="monospace" font-size="34" font-weight="700" letter-spacing="8" text-anchor="middle">03:04</text>
+  <text x="256" y="348" fill="#eee9df" font-family="Georgia,serif" font-size="158" text-anchor="middle">?</text>
+</svg>

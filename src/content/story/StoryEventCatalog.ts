@@ -4,7 +4,10 @@ import {
   BEDROOM_FAMILY_PHOTO_OBJECT_ID,
   BEDROOM_STORY_OBJECT_IDS,
   CORRIDOR_PHONE_OBJECT_ID,
+  KITCHEN_STORY_OBJECT_IDS,
+  OFFICE_STORY_OBJECT_IDS,
 } from './StoryInteractionCatalog';
+import { STORY_EASTER_EGG_DISCOVERY_IDS } from './StoryLoopAnchor';
 
 export const STORY_EVENT_CATALOG = [
   {
@@ -98,7 +101,10 @@ export const STORY_EVENT_CATALOG = [
     },
     effects: [
       { type: 'subtitle', copyKey: 'story.bedroom.inspectBooks' },
-      { type: 'add-discovery', discoveryId: 'bedroom-page-317' },
+      {
+        type: 'add-discovery',
+        discoveryId: STORY_EASTER_EGG_DISCOVERY_IDS.bedroomPage,
+      },
     ],
     repeat: 'once-per-loop',
   },
@@ -159,8 +165,9 @@ export const STORY_EVENT_CATALOG = [
       objectId: BATHROOM_STORY_OBJECT_IDS.mirror,
     },
     effects: [
-      { type: 'subtitle', copyKey: 'story.bathroom.inspectMirror' },
-      { type: 'add-discovery', discoveryId: 'bathroom-inside-fingerprints' },
+      { type: 'audio', cueId: 'story-bathroom-warning', action: 'play' },
+      { type: 'subtitle', copyKey: 'story.bathroom.mirrorWarning' },
+      { type: 'add-fragment', fragmentId: 'memory-mirror-warning' },
     ],
     repeat: 'once-per-loop',
   },
@@ -212,7 +219,10 @@ export const STORY_EVENT_CATALOG = [
     },
     effects: [
       { type: 'subtitle', copyKey: 'story.bathroom.inspectDuck' },
-      { type: 'add-discovery', discoveryId: 'bathroom-duck-317' },
+      {
+        type: 'add-discovery',
+        discoveryId: STORY_EASTER_EGG_DISCOVERY_IDS.bathroomDuck,
+      },
     ],
     repeat: 'once-per-loop',
   },
@@ -253,43 +263,6 @@ export const STORY_EVENT_CATALOG = [
     effects: [
       { type: 'audio', cueId: 'story-bathroom-pipes', action: 'play' },
       { type: 'subtitle', copyKey: 'story.bathroom.pipes' },
-    ],
-    repeat: 'once-per-loop',
-  },
-  {
-    id: 'bathroom-mirror-warning',
-    roomId: 'bathroom',
-    trigger: { type: 'room-completed' },
-    effects: [
-      {
-        type: 'helper-visibility',
-        bindingId: 'bathroom-mirror-fog',
-        visible: true,
-      },
-      { type: 'audio', cueId: 'story-bathroom-warning', action: 'play' },
-      { type: 'subtitle', copyKey: 'story.bathroom.mirrorWarning' },
-      { type: 'add-discovery', discoveryId: 'bathroom-mirror-warning' },
-      { type: 'add-fragment', fragmentId: 'memory-mirror-warning' },
-    ],
-    repeat: 'once-per-loop',
-  },
-  {
-    id: 'bathroom-mirror-warning-fades',
-    roomId: 'bathroom',
-    trigger: {
-      type: 'phase-elapsed',
-      phase: 'room-complete',
-      elapsedMs: 4_200,
-    },
-    conditions: {
-      eventsTriggeredThisLoop: ['bathroom-mirror-warning'],
-    },
-    effects: [
-      {
-        type: 'helper-visibility',
-        bindingId: 'bathroom-mirror-fog',
-        visible: false,
-      },
     ],
     repeat: 'once-per-loop',
   },
@@ -349,6 +322,282 @@ export const STORY_EVENT_CATALOG = [
     effects: [
       { type: 'audio', cueId: 'story-corridor-failure', action: 'play' },
       { type: 'screen-effect', effectId: 'corridor-ringing-failure' },
+    ],
+    repeat: 'once-per-loop',
+  },
+  {
+    id: 'office-radio-pattern',
+    roomId: 'office',
+    trigger: {
+      type: 'phase-elapsed',
+      phase: 'observation',
+      elapsedMs: 1_800,
+    },
+    effects: [
+      { type: 'audio', cueId: 'story-office-radio-pattern', action: 'play' },
+      { type: 'subtitle', copyKey: 'story.office.radioPattern' },
+    ],
+    repeat: 'once-per-loop',
+  },
+  {
+    id: 'office-predicted-silence',
+    roomId: 'office',
+    trigger: {
+      type: 'phase-elapsed',
+      phase: 'observation',
+      elapsedMs: 5_200,
+    },
+    conditions: {
+      flags: [{ flagId: 'corridor-phone-answered', value: true }],
+    },
+    effects: [
+      { type: 'audio', cueId: 'story-office-radio-silence', action: 'play' },
+      { type: 'subtitle', copyKey: 'story.office.predictedSilence' },
+      { type: 'add-discovery', discoveryId: 'office-predicted-silence' },
+    ],
+    repeat: 'once-per-loop',
+  },
+  {
+    id: 'office-radio-inspection',
+    roomId: 'office',
+    trigger: {
+      type: 'object-examined',
+      objectId: OFFICE_STORY_OBJECT_IDS.radio,
+    },
+    effects: [
+      { type: 'subtitle', copyKey: 'story.office.inspectRadio' },
+      { type: 'add-discovery', discoveryId: 'office-radio-pattern' },
+    ],
+    repeat: 'once-per-loop',
+  },
+  {
+    id: 'office-phone-inspection',
+    roomId: 'office',
+    trigger: {
+      type: 'object-examined',
+      objectId: OFFICE_STORY_OBJECT_IDS.phone,
+    },
+    effects: [
+      { type: 'subtitle', copyKey: 'story.office.inspectPhone' },
+      { type: 'add-discovery', discoveryId: 'office-early-echo' },
+    ],
+    repeat: 'once-per-loop',
+  },
+  {
+    id: 'office-clock-inspection',
+    roomId: 'office',
+    trigger: {
+      type: 'object-examined',
+      objectId: OFFICE_STORY_OBJECT_IDS.clock,
+    },
+    effects: [
+      { type: 'subtitle', copyKey: 'story.office.inspectClock' },
+      { type: 'add-discovery', discoveryId: 'office-clock-304' },
+    ],
+    repeat: 'once-per-loop',
+  },
+  {
+    id: 'office-erased-name-inspection',
+    roomId: 'office',
+    trigger: {
+      type: 'object-examined',
+      objectId: OFFICE_STORY_OBJECT_IDS.photo,
+    },
+    effects: [
+      { type: 'audio', cueId: 'story-office-erased-name', action: 'play' },
+      { type: 'screen-effect', effectId: 'office-erased-name' },
+      { type: 'subtitle', copyKey: 'story.office.erasedName' },
+      { type: 'add-discovery', discoveryId: 'office-erased-name' },
+      { type: 'add-fragment', fragmentId: 'memory-erased-name' },
+    ],
+    repeat: 'once-per-loop',
+  },
+  {
+    id: 'office-memory-unlocks-exit',
+    roomId: 'office',
+    trigger: { type: 'room-completed' },
+    conditions: {
+      eventsTriggeredThisLoop: ['office-erased-name-inspection'],
+    },
+    effects: [
+      { type: 'subtitle', copyKey: 'story.office.exit' },
+    ],
+    repeat: 'once-per-loop',
+  },
+  {
+    id: 'office-radio-failure',
+    roomId: 'office',
+    trigger: { type: 'run-error' },
+    conditions: { minimumPressure: 3 },
+    effects: [
+      { type: 'audio', cueId: 'story-office-failure', action: 'play' },
+      { type: 'screen-effect', effectId: 'office-erased-name' },
+      { type: 'subtitle', copyKey: 'story.office.failure' },
+    ],
+    repeat: 'once-per-loop',
+  },
+  {
+    id: 'kitchen-reverse-breakfast',
+    roomId: 'kitchen',
+    trigger: {
+      type: 'phase-elapsed',
+      phase: 'observation',
+      elapsedMs: 1_600,
+    },
+    effects: [
+      {
+        type: 'audio',
+        cueId: 'story-kitchen-reverse-breakfast',
+        action: 'play',
+      },
+      { type: 'subtitle', copyKey: 'story.kitchen.reverseBreakfast' },
+    ],
+    repeat: 'once-per-loop',
+  },
+  {
+    id: 'kitchen-chair-before-arrival',
+    roomId: 'kitchen',
+    trigger: {
+      type: 'phase-elapsed',
+      phase: 'observation',
+      elapsedMs: 6_200,
+    },
+    conditions: {
+      eventsTriggeredThisLoop: ['kitchen-reverse-breakfast'],
+    },
+    effects: [
+      {
+        type: 'audio',
+        cueId: 'story-kitchen-chair-scrape',
+        action: 'play',
+      },
+      { type: 'subtitle', copyKey: 'story.kitchen.chairBeforeArrival' },
+    ],
+    repeat: 'once-per-loop',
+  },
+  {
+    id: 'kitchen-fridge-inspection',
+    roomId: 'kitchen',
+    trigger: {
+      type: 'object-examined',
+      objectId: KITCHEN_STORY_OBJECT_IDS.fridge,
+    },
+    effects: [
+      { type: 'subtitle', copyKey: 'story.kitchen.inspectFridge' },
+      { type: 'add-discovery', discoveryId: 'kitchen-future-dates' },
+    ],
+    repeat: 'once-per-loop',
+  },
+  {
+    id: 'kitchen-microwave-inspection',
+    roomId: 'kitchen',
+    trigger: {
+      type: 'object-examined',
+      objectId: KITCHEN_STORY_OBJECT_IDS.microwave,
+    },
+    effects: [
+      { type: 'subtitle', copyKey: 'story.kitchen.inspectMicrowave' },
+      { type: 'add-discovery', discoveryId: 'kitchen-early-chime' },
+    ],
+    repeat: 'once-per-loop',
+  },
+  {
+    id: 'kitchen-sink-inspection',
+    roomId: 'kitchen',
+    trigger: {
+      type: 'object-examined',
+      objectId: KITCHEN_STORY_OBJECT_IDS.sink,
+    },
+    effects: [
+      { type: 'subtitle', copyKey: 'story.kitchen.inspectSink' },
+      { type: 'add-discovery', discoveryId: 'kitchen-tomorrow-fingerprints' },
+    ],
+    repeat: 'once-per-loop',
+  },
+  {
+    id: 'kitchen-stove-inspection',
+    roomId: 'kitchen',
+    trigger: {
+      type: 'object-examined',
+      objectId: KITCHEN_STORY_OBJECT_IDS.stove,
+    },
+    effects: [
+      { type: 'subtitle', copyKey: 'story.kitchen.inspectStove' },
+      { type: 'add-discovery', discoveryId: 'kitchen-reflected-flame' },
+    ],
+    repeat: 'once-per-loop',
+  },
+  {
+    id: 'kitchen-coffee-inspection',
+    roomId: 'kitchen',
+    trigger: {
+      type: 'object-examined',
+      objectId: KITCHEN_STORY_OBJECT_IDS.coffeeMachine,
+    },
+    effects: [
+      { type: 'subtitle', copyKey: 'story.kitchen.inspectCoffee' },
+      { type: 'add-discovery', discoveryId: 'kitchen-missing-cup' },
+    ],
+    repeat: 'once-per-loop',
+  },
+  {
+    id: 'kitchen-trashcan-inspection',
+    roomId: 'kitchen',
+    trigger: {
+      type: 'object-examined',
+      objectId: KITCHEN_STORY_OBJECT_IDS.trashcan,
+    },
+    effects: [
+      { type: 'subtitle', copyKey: 'story.kitchen.inspectTrashcan' },
+      { type: 'add-discovery', discoveryId: 'kitchen-receipt-304' },
+    ],
+    repeat: 'once-per-loop',
+  },
+  {
+    id: 'kitchen-fourth-place-inspection',
+    roomId: 'kitchen',
+    trigger: {
+      type: 'object-examined',
+      objectId: KITCHEN_STORY_OBJECT_IDS.breakfastTable,
+    },
+    effects: [
+      {
+        type: 'audio',
+        cueId: 'story-kitchen-chair-scrape',
+        action: 'play',
+      },
+      { type: 'screen-effect', effectId: 'kitchen-service-ticket' },
+      { type: 'subtitle', copyKey: 'story.kitchen.fourthPlace' },
+      { type: 'add-discovery', discoveryId: 'kitchen-fourth-place' },
+      { type: 'add-fragment', fragmentId: 'memory-kitchen-fourth-place' },
+    ],
+    repeat: 'once-per-loop',
+  },
+  {
+    id: 'kitchen-memory-unlocks-exit',
+    roomId: 'kitchen',
+    trigger: { type: 'room-completed' },
+    conditions: {
+      eventsTriggeredThisLoop: ['kitchen-fourth-place-inspection'],
+    },
+    effects: [
+      { type: 'subtitle', copyKey: 'story.kitchen.exit' },
+    ],
+    repeat: 'once-per-loop',
+  },
+  {
+    id: 'kitchen-service-failure',
+    roomId: 'kitchen',
+    trigger: { type: 'run-error' },
+    conditions: { minimumPressure: 3 },
+    effects: [
+      {
+        type: 'audio',
+        cueId: 'story-kitchen-failure',
+        action: 'play',
+      },
+      { type: 'screen-effect', effectId: 'kitchen-service-ticket' },
+      { type: 'subtitle', copyKey: 'story.kitchen.failure' },
     ],
     repeat: 'once-per-loop',
   },

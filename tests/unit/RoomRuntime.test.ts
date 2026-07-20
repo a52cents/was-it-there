@@ -64,6 +64,31 @@ describe('RoomRuntime', () => {
     room.unmount();
   });
 
+  it('adds shared sky and bounce lighting inside the controllable room root', () => {
+    const room = new TestRoom();
+    room.mount({
+      scene: new THREE.Scene(),
+      worldCollision: new WorldCollision(),
+    });
+
+    const skyFill = room
+      .getVisualRoot()
+      .getObjectByName('LIGHT_GlobalSkyFill') as
+        | THREE.HemisphereLight
+        | undefined;
+    const bounce = room
+      .getVisualRoot()
+      .getObjectByName('LIGHT_GlobalBounce') as
+        | THREE.AmbientLight
+        | undefined;
+
+    expect(skyFill).toBeInstanceOf(THREE.HemisphereLight);
+    expect(skyFill?.intensity).toBeCloseTo(0.09);
+    expect(bounce).toBeInstanceOf(THREE.AmbientLight);
+    expect(bounce?.intensity).toBeCloseTo(0.03);
+    room.unmount();
+  });
+
   it('exposes a fresh player spawn in the player controller format', () => {
     const room = new TestRoom();
 

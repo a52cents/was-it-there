@@ -35,6 +35,7 @@ export abstract class RoomRuntime {
 
     try {
       this.buildRoom();
+      this.createSharedAmbience();
       this.visualRoot.updateMatrixWorld(true);
       this.collisionRoot.updateMatrixWorld(true);
       this.visualObjectCount = this.countMeshes(
@@ -201,6 +202,18 @@ export abstract class RoomRuntime {
 
   protected onRoomReleased(): void {
     // Concrete rooms can clear references to locally owned scene objects.
+  }
+
+  private createSharedAmbience(): void {
+    const skyFill = new THREE.HemisphereLight(
+      '#c9dbe0',
+      '#66564a',
+      0.09,
+    );
+    skyFill.name = 'LIGHT_GlobalSkyFill';
+    const bounce = new THREE.AmbientLight('#d8d2c7', 0.03);
+    bounce.name = 'LIGHT_GlobalBounce';
+    this.visualRoot.add(skyFill, bounce);
   }
 
   private releaseRoomContents(): void {

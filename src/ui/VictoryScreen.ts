@@ -1,11 +1,13 @@
 import type { RunTiming } from '../app/RunTimer';
 import { ENGLISH_COPY } from '../content/strings/en';
 import { formatElapsedMilliseconds } from '../core/time/TimeFormatting';
+import type { StoryChapterOutcome } from '../gameplay/story/StoryChapterOutcome';
 
 export interface VictorySummary {
   readonly timing: RunTiming;
   readonly errorCount: number;
   readonly maximumErrors: number;
+  readonly storyOutcome?: StoryChapterOutcome;
 }
 
 type PlayAgainHandler = () => Promise<void> | void;
@@ -13,6 +15,8 @@ type ReturnToMenuHandler = () => Promise<void> | void;
 
 export class VictoryScreen {
   private readonly element: HTMLElement;
+  private readonly title: HTMLHeadingElement;
+  private readonly storyOutcome: HTMLElement;
   private readonly activeTime: HTMLTimeElement;
   private readonly penalties: HTMLElement;
   private readonly finalTime: HTMLTimeElement;
@@ -33,9 +37,13 @@ export class VictoryScreen {
 
     const panel = document.createElement('div');
     panel.className = 'victory-panel';
-    const title = document.createElement('h2');
-    title.id = 'victory-title';
-    title.textContent = ENGLISH_COPY.victory;
+    this.title = document.createElement('h2');
+    this.title.id = 'victory-title';
+    this.title.textContent = ENGLISH_COPY.victory;
+
+    this.storyOutcome = document.createElement('p');
+    this.storyOutcome.className = 'victory-story-outcome';
+    this.storyOutcome.hidden = true;
 
     this.activeTime = document.createElement('time');
     this.activeTime.className = 'victory-active-time';
@@ -65,7 +73,8 @@ export class VictoryScreen {
     actions.append(this.playAgainButton, this.modeSelectButton);
 
     panel.append(
-      title,
+      this.title,
+      this.storyOutcome,
       this.activeTime,
       this.penalties,
       this.finalTime,
@@ -95,6 +104,21 @@ export class VictoryScreen {
     this.finalTime.textContent = `${ENGLISH_COPY.finalTime}: ${finalTime}`;
     this.finalTime.dateTime = `PT${Math.floor(summary.timing.finalTimeMs / 1_000)}S`;
     this.errors.textContent = `${ENGLISH_COPY.errors}: ${summary.errorCount} / ${summary.maximumErrors}`;
+    const outcomeCopy = summary.storyOutcome === undefined
+      ? null
+      : {
+          'chapter-escaped': {
+            title: 'CHAPTER ESCAPED',
+            body: 'You escaped the reconstruction. One memory is still missing.',
+          },
+          'chapter-remembered': {
+            title: 'CHAPTER REMEMBERED',
+            body: 'All four memories agree: the house erased you on purpose.',
+          },
+        }[summary.storyOutcome];
+    this.title.textContent = outcomeCopy?.title ?? ENGLISH_COPY.victory;
+    this.storyOutcome.textContent = outcomeCopy?.body ?? '';
+    this.storyOutcome.hidden = outcomeCopy === null;
     this.perfectRun.textContent = ENGLISH_COPY.perfectRun;
     this.perfectRun.hidden = summary.errorCount !== 0;
     this.setBusy(false);

@@ -1,11 +1,13 @@
 import type { StoryPhase } from './StoryEvent';
 
+export type StoryInteractionPhase = Extract<StoryPhase, 'room-complete'>;
+
 export interface StoryInteractionDefinition {
   readonly id: string;
   readonly roomId: string;
   readonly targetId: string;
   readonly actionLabel: string;
-  readonly phases: readonly StoryPhase[];
+  readonly phases: readonly StoryInteractionPhase[];
   readonly requiredEventIdBeforeExit?: string;
   readonly exitInstruction?: string;
 }
@@ -101,7 +103,11 @@ export class StoryInteractionRegistry {
       createBindingKey(roomId, targetId),
     );
 
-    if (interaction === undefined || !interaction.phases.includes(phase)) {
+    if (
+      interaction === undefined ||
+      phase !== 'room-complete' ||
+      !interaction.phases.includes(phase)
+    ) {
       return null;
     }
 

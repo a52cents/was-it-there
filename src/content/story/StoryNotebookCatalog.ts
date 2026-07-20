@@ -1,4 +1,8 @@
 import type { PersistentStoryProgressSnapshot } from '../../gameplay/story/StoryProgress';
+import {
+  STORY_EASTER_EGG_DISCOVERY_IDS,
+  STORY_LOOP_ANCHOR,
+} from './StoryLoopAnchor';
 
 export type StoryNotebookEntryCategory =
   | 'rule'
@@ -53,20 +57,15 @@ export const STORY_NOTEBOOK_CATALOG: readonly StoryNotebookEntryDefinition[] = [
     unlock: { type: 'discovery', id: 'bedroom-missing-reflection' },
   },
   {
-    id: 'bedroom-page-317',
+    id: STORY_EASTER_EGG_DISCOVERY_IDS.bedroomPage,
     category: 'event',
-    title: 'PAGE 317',
+    title: `PAGE ${STORY_LOOP_ANCHOR.number}`,
     body:
       'Every book stops on the same page. The final sentence is different in each one, but they all end with my name.',
-    unlock: { type: 'discovery', id: 'bedroom-page-317' },
-  },
-  {
-    id: 'bathroom-inside-fingerprints',
-    category: 'event',
-    title: 'BEHIND THE MIRROR',
-    body:
-      'The fingerprints were not on the surface. They moved behind the glass, as if the reflection were another room.',
-    unlock: { type: 'discovery', id: 'bathroom-inside-fingerprints' },
+    unlock: {
+      type: 'discovery',
+      id: STORY_EASTER_EGG_DISCOVERY_IDS.bedroomPage,
+    },
   },
   {
     id: 'bathroom-fourth-toothbrush',
@@ -77,19 +76,22 @@ export const STORY_NOTEBOOK_CATALOG: readonly StoryNotebookEntryDefinition[] = [
     unlock: { type: 'discovery', id: 'bathroom-fourth-toothbrush' },
   },
   {
-    id: 'bathroom-duck-317',
+    id: STORY_EASTER_EGG_DISCOVERY_IDS.bathroomDuck,
     category: 'event',
-    title: '317 AGAIN',
+    title: `${STORY_LOOP_ANCHOR.number} AGAIN`,
     body:
       'The number beneath the rubber duck matches the final page in every bedroom book. Someone carved it recently.',
-    unlock: { type: 'discovery', id: 'bathroom-duck-317' },
+    unlock: {
+      type: 'discovery',
+      id: STORY_EASTER_EGG_DISCOVERY_IDS.bathroomDuck,
+    },
   },
   {
     id: 'bathroom-mirror-warning',
     category: 'memory',
     title: 'THE WARNING',
     body:
-      'Writing appeared in the mirror only after the room was stable. It warned that the house can replace a person as easily as an object.',
+      'Examining the mirror produced a warning: the house can replace a person as easily as an object.',
     unlock: { type: 'fragment', id: 'memory-mirror-warning' },
   },
   {
@@ -99,6 +101,70 @@ export const STORY_NOTEBOOK_CATALOG: readonly StoryNotebookEntryDefinition[] = [
     body:
       'The corridor caller knew what would happen in the office: when the radio stops, do not answer your name.',
     unlock: { type: 'fragment', id: 'memory-phone-prediction' },
+  },
+  {
+    id: 'office-predicted-silence',
+    category: 'event',
+    title: 'THE PROMISED SILENCE',
+    body:
+      'The office radio stopped exactly when the corridor caller said it would. Something used the silence to test the beginning of my name.',
+    unlock: { type: 'discovery', id: 'office-predicted-silence' },
+  },
+  {
+    id: 'office-clock-304',
+    category: 'event',
+    title: `${STORY_LOOP_ANCHOR.displayTime} IN THE OFFICE`,
+    body:
+      'The office clock has no hands or mechanism. It still displays the same time that anchors every reconstruction.',
+    unlock: { type: 'discovery', id: 'office-clock-304' },
+  },
+  {
+    id: 'office-erased-name',
+    category: 'memory',
+    title: 'THE ERASED NAME',
+    body:
+      'The missing resident was not forgotten by accident. The erased name matches the identity the house is trying to give me.',
+    unlock: { type: 'fragment', id: 'memory-erased-name' },
+  },
+  {
+    id: 'kitchen-reverse-breakfast',
+    category: 'event',
+    title: 'BREAKFAST IN REVERSE',
+    body:
+      'The appliances replayed the end of a breakfast before anyone sat down. The kitchen remembers events that have not happened yet.',
+    unlock: { type: 'event', id: 'kitchen-reverse-breakfast' },
+  },
+  {
+    id: 'kitchen-receipt-304',
+    category: 'event',
+    title: `THE ${STORY_LOOP_ANCHOR.displayTime} RECEIPT`,
+    body:
+      'A receipt records four breakfasts at the loop time, but payment for only three. Its date is tomorrow.',
+    unlock: { type: 'discovery', id: 'kitchen-receipt-304' },
+  },
+  {
+    id: 'kitchen-fourth-place',
+    category: 'memory',
+    title: 'THE FOURTH PLACE',
+    body:
+      'The family kept setting my place even after the house removed my name. The room remembers my absence as part of the meal.',
+    unlock: { type: 'fragment', id: 'memory-kitchen-fourth-place' },
+  },
+  {
+    id: 'chapter-escaped',
+    category: 'outcome',
+    title: 'CHAPTER ESCAPED',
+    body:
+      'I escaped the reconstructed rooms, but part of the memory is still missing. The house knows more about me than I do.',
+    unlock: { type: 'outcome', id: 'chapter-escaped' },
+  },
+  {
+    id: 'chapter-remembered',
+    category: 'outcome',
+    title: 'CHAPTER REMEMBERED',
+    body:
+      'All four memories connect. My identity belongs to the resident the house deliberately removed from its records.',
+    unlock: { type: 'outcome', id: 'chapter-remembered' },
   },
   {
     id: 'chapter-one-complete',

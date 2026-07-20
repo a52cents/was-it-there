@@ -2,9 +2,17 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
     <meta name="theme-color" content="#090a0c" />
-    <link rel="icon" href="data:," />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./pwa-icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./pwa-icon.svg" />
     <title>Was It There?</title>
   </head>
   <body>
@@ -19,7 +27,7 @@
         <div class="menu-backdrop" aria-hidden="true"></div>
 
         <main class="start-screen" aria-labelledby="game-title">
-          <p class="start-screen__time">03:17</p>
+          <p class="start-screen__time">03:04</p>
 
           <div class="start-screen__title-block">
             <h1 id="game-title">
@@ -83,9 +91,12 @@
           </div>
 
           <div class="start-screen__controls" aria-label="Game controls">
-            <span>WASD / MOVE</span>
-            <span>MOUSE / LOOK</span>
-            <span>CLICK / REPORT</span>
+            <span class="desktop-only">WASD / MOVE</span>
+            <span class="desktop-only">MOUSE / LOOK</span>
+            <span class="desktop-only">CLICK / REPORT</span>
+            <span class="touch-only">JOYSTICK / MOVE</span>
+            <span class="touch-only">DRAG / LOOK</span>
+            <span class="touch-only">ACTION / REPORT</span>
           </div>
         </main>
       </div>

@@ -12,9 +12,13 @@ const CALM_LIGHT_COLOR = new THREE.Color(0xffd39b);
 
 export class HousePressureLighting {
   private readonly lights: LightBaseline[] = [];
+  private scene: THREE.Scene | null = null;
+  private environmentIntensity = 1;
 
-  public bind(root: THREE.Object3D): void {
+  public bind(root: THREE.Object3D, scene?: THREE.Scene): void {
     this.release();
+    this.scene = scene ?? null;
+    this.environmentIntensity = scene?.environmentIntensity ?? 1;
     root.traverse((object) => {
       const light = object as THREE.Light;
 
@@ -39,6 +43,11 @@ export class HousePressureLighting {
         .lerp(COLD_LIGHT_COLOR, snapshot.coldShift)
         .lerp(CALM_LIGHT_COLOR, snapshot.calmIntensity * 0.22);
     }
+
+    if (this.scene !== null) {
+      this.scene.environmentIntensity =
+        this.environmentIntensity * snapshot.lightMultiplier;
+    }
   }
 
   public release(): void {
@@ -47,6 +56,12 @@ export class HousePressureLighting {
       baseline.light.color.copy(baseline.color);
     }
 
+    if (this.scene !== null) {
+      this.scene.environmentIntensity = this.environmentIntensity;
+    }
+
     this.lights.length = 0;
+    this.scene = null;
+    this.environmentIntensity = 1;
   }
 }

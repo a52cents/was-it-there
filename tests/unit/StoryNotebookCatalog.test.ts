@@ -25,13 +25,13 @@ describe('StoryNotebookCatalog', () => {
   it('records hidden inspection easter eggs as notebook entries', () => {
     const entries = getUnlockedStoryNotebookEntries({
       ...createEmptyStoryProgress(),
-      discoveries: ['bedroom-page-317', 'bedroom-missing-reflection'],
+      discoveries: ['bedroom-page-304', 'bedroom-missing-reflection'],
     });
 
     expect(entries.map((entry) => entry.id)).toEqual([
       'observation-protocol',
       'bedroom-missing-reflection',
-      'bedroom-page-317',
+      'bedroom-page-304',
     ]);
   });
 
@@ -50,17 +50,51 @@ describe('StoryNotebookCatalog', () => {
     const entries = getUnlockedStoryNotebookEntries({
       ...createEmptyStoryProgress(),
       discoveries: [
-        'bathroom-inside-fingerprints',
         'bathroom-fourth-toothbrush',
-        'bathroom-duck-317',
+        'bathroom-duck-304',
       ],
+      fragments: ['memory-mirror-warning'],
     });
 
     expect(entries.map((entry) => entry.id)).toEqual([
       'observation-protocol',
-      'bathroom-inside-fingerprints',
       'bathroom-fourth-toothbrush',
-      'bathroom-duck-317',
+      'bathroom-duck-304',
+      'bathroom-mirror-warning',
+    ]);
+  });
+
+  it('records the office memory and its remembered chapter outcome', () => {
+    const entries = getUnlockedStoryNotebookEntries({
+      ...createEmptyStoryProgress(),
+      discoveries: ['office-predicted-silence', 'office-clock-304'],
+      fragments: ['memory-erased-name'],
+      chapterOutcomeIds: ['chapter-one-complete', 'chapter-remembered'],
+    });
+
+    expect(entries.map((entry) => entry.id)).toEqual([
+      'observation-protocol',
+      'office-predicted-silence',
+      'office-clock-304',
+      'office-erased-name',
+      'chapter-remembered',
+      'chapter-one-complete',
+    ]);
+  });
+
+  it('records the reversed breakfast and the fourth-place memory', () => {
+    const entries = getUnlockedStoryNotebookEntries({
+      ...createEmptyStoryProgress(),
+      discoveries: ['kitchen-receipt-304'],
+      fragments: ['memory-kitchen-fourth-place'],
+      triggeredEventIds: ['kitchen-reverse-breakfast'],
+    });
+
+    expect(entries.map((entry) => entry.id)).toEqual([
+      'observation-protocol',
+      'kitchen-reverse-breakfast',
+      'kitchen-receipt-304',
+      'kitchen-fourth-place',
     ]);
   });
 });

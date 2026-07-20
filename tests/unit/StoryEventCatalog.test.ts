@@ -114,7 +114,7 @@ describe('StoryEventCatalog', () => {
     );
   });
 
-  it('reveals and restores the bathroom mirror warning after reporting', () => {
+  it('shows the bathroom mirror warning only when the mirror is examined', () => {
     const progress = new StoryProgress();
     const onEffect = vi.fn();
     const director = new StoryDirector(STORY_EVENT_CATALOG, progress, {
@@ -136,13 +136,13 @@ describe('StoryEventCatalog', () => {
         objectId: 'bathroom-mirror',
       }),
     ).toBe(1);
-    expect(progress.hasDiscovery('bathroom-inside-fingerprints')).toBe(true);
+    expect(progress.hasFragment('memory-mirror-warning')).toBe(true);
     expect(onEffect).toHaveBeenCalledWith(
       expect.objectContaining({
         eventId: 'bathroom-mirror-inspection',
         effect: {
           type: 'subtitle',
-          copyKey: 'story.bathroom.inspectMirror',
+          copyKey: 'story.bathroom.mirrorWarning',
         },
       }),
     );
@@ -153,33 +153,10 @@ describe('StoryEventCatalog', () => {
         objectId: 'bathroom-rubber-duck',
       }),
     ).toBe(1);
-    expect(progress.hasDiscovery('bathroom-duck-317')).toBe(true);
+    expect(progress.hasDiscovery('bathroom-duck-304')).toBe(true);
 
     director.startPhase('room-complete');
-    expect(director.emit({ type: 'room-completed' })).toBe(1);
-    expect(progress.hasFragment('memory-mirror-warning')).toBe(true);
-    expect(onEffect).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventId: 'bathroom-mirror-warning',
-        effect: {
-          type: 'helper-visibility',
-          bindingId: 'bathroom-mirror-fog',
-          visible: true,
-        },
-      }),
-    );
-
-    expect(director.update(4_200)).toBe(1);
-    expect(onEffect).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventId: 'bathroom-mirror-warning-fades',
-        effect: {
-          type: 'helper-visibility',
-          bindingId: 'bathroom-mirror-fog',
-          visible: false,
-        },
-      }),
-    );
+    expect(director.emit({ type: 'room-completed' })).toBe(0);
   });
 
   it('records the optional corridor prediction when the ringing phone is answered', () => {
@@ -232,6 +209,138 @@ describe('StoryEventCatalog', () => {
         effect: {
           type: 'screen-effect',
           effectId: 'corridor-ringing-failure',
+        },
+      }),
+    );
+  });
+
+  it('pays off the corridor warning and reveals the erased name in the office', () => {
+    const progress = new StoryProgress();
+    const onEffect = vi.fn();
+    const director = new StoryDirector(STORY_EVENT_CATALOG, progress, {
+      onEffect,
+    });
+    director.beginLoop('story', 'greybox-bedroom');
+    progress.setFlag('corridor-phone-answered', true);
+    director.enterRoom('office');
+    director.startPhase('observation');
+
+    expect(director.update(1_799)).toBe(0);
+    expect(director.update(1)).toBe(1);
+    expect(director.update(3_400)).toBe(1);
+    expect(progress.hasDiscovery('office-predicted-silence')).toBe(true);
+
+    for (const objectId of [
+      'office-radio',
+      'office-phone',
+      'office-wall-clock',
+    ]) {
+      expect(
+        director.emit({ type: 'object-examined', objectId }),
+        objectId,
+      ).toBe(1);
+    }
+
+    expect(
+      director.emit({
+        type: 'object-examined',
+        objectId: 'office-desk-photo',
+      }),
+    ).toBe(1);
+    expect(progress.hasFragment('memory-erased-name')).toBe(true);
+    expect(onEffect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventId: 'office-erased-name-inspection',
+        effect: {
+          type: 'screen-effect',
+          effectId: 'office-erased-name',
+        },
+      }),
+    );
+
+    director.startPhase('room-complete');
+    expect(director.emit({ type: 'room-completed' })).toBe(1);
+    director.setPressureLevel(3);
+    expect(director.emit({ type: 'run-error', kind: 'timeout' })).toBe(1);
+    expect(onEffect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventId: 'office-radio-failure',
+        effect: {
+          type: 'audio',
+          cueId: 'story-office-failure',
+          action: 'play',
+        },
+      }),
+    );
+  });
+
+  it('replays breakfast backwards and reveals the fourth place in the kitchen', () => {
+    const progress = new StoryProgress();
+    const onEffect = vi.fn();
+    const director = new StoryDirector(STORY_EVENT_CATALOG, progress, {
+      onEffect,
+    });
+    director.beginLoop('story', 'greybox-bedroom');
+    director.enterRoom('kitchen');
+    director.startPhase('observation');
+
+    expect(director.update(1_599)).toBe(0);
+    expect(director.update(1)).toBe(1);
+    expect(onEffect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventId: 'kitchen-reverse-breakfast',
+        effect: {
+          type: 'audio',
+          cueId: 'story-kitchen-reverse-breakfast',
+          action: 'play',
+        },
+      }),
+    );
+    expect(director.update(4_600)).toBe(1);
+
+    for (const objectId of [
+      'kitchen-fridge',
+      'kitchen-microwave',
+      'kitchen-sink',
+      'kitchen-stove',
+      'kitchen-coffee-machine',
+      'kitchen-trashcan',
+    ]) {
+      expect(
+        director.emit({ type: 'object-examined', objectId }),
+        objectId,
+      ).toBe(1);
+    }
+
+    expect(
+      director.emit({
+        type: 'object-examined',
+        objectId: 'kitchen-breakfast-table',
+      }),
+    ).toBe(1);
+    expect(progress.hasFragment('memory-kitchen-fourth-place')).toBe(true);
+    expect(progress.hasDiscovery('kitchen-receipt-304')).toBe(true);
+    expect(onEffect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventId: 'kitchen-fourth-place-inspection',
+        effect: {
+          type: 'screen-effect',
+          effectId: 'kitchen-service-ticket',
+        },
+      }),
+    );
+
+    director.startPhase('room-complete');
+    expect(director.emit({ type: 'room-completed' })).toBe(1);
+    director.setPressureLevel(3);
+    expect(director.emit({ type: 'run-error', kind: 'timeout' })).toBe(1);
+    expect(onEffect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventId: 'kitchen-service-failure',
+        effect: {
+          type: 'audio',
+          cueId: 'story-kitchen-failure',
+          action: 'play',
         },
       }),
     );

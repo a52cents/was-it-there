@@ -7,15 +7,31 @@ import {
 } from './LevelBuilderDocument';
 import { serializeLevelBuilderLayoutDocument } from './LevelBuilderLayoutDocument';
 import type { LevelBuilderSession } from './LevelBuilderSession';
+import {
+  LEVEL_BUILDER_SNAP_PRESETS,
+  type LevelBuilderSnapPreset,
+} from './LevelBuilderSnap';
 
 export type LevelBuilderTransformMode = 'translate' | 'rotate' | 'scale';
 
+export interface LevelBuilderRoomOption {
+  readonly roomIndex: number;
+  readonly id: string;
+  readonly label: string;
+}
+
 export interface LevelBuilderPanelOptions {
   readonly roomRoot: THREE.Object3D;
+  readonly roomId: string;
+  readonly rooms: readonly LevelBuilderRoomOption[];
   readonly session: LevelBuilderSession;
   readonly onClose: () => void;
   readonly onSelectObject: (object: THREE.Object3D) => void;
   readonly onTransformModeChange: (mode: LevelBuilderTransformMode) => void;
+  readonly onSnapPresetChange: (preset: LevelBuilderSnapPreset) => void;
+  readonly onDuplicateSelection: () => void;
+  readonly onRemoveSelection: () => void;
+  readonly onRoomChange: (roomIndex: number) => Promise<void>;
   readonly onFocusSelection: () => void;
   readonly onObjectChanged: () => void;
 }
@@ -29,6 +45,10 @@ export class LevelBuilderPanel {
     LevelBuilderTransformMode,
     HTMLButtonElement
   >();
+  private readonly roomSelect: HTMLSelectElement;
+  private readonly snapPresetSelect: HTMLSelectElement;
+  private readonly duplicateButton: HTMLButtonElement;
+  private readonly removeButton: HTMLButtonElement;
   private readonly visibilityInput: HTMLInputElement;
   private readonly colorInput: HTMLInputElement;
   private readonly variantIdInput: HTMLInputElement;
@@ -58,6 +78,21 @@ export class LevelBuilderPanel {
     closeButton.addEventListener('click', this.handleClose);
     header.append(titleGroup, closeButton);
 
+    const roomSection = this.createSection(document, 'LEVEL');
+    this.roomSelect = document.createElement('select');
+    this.roomSelect.setAttribute('aria-label', 'Level');
+
+    for (const room of options.rooms) {
+      const option = document.createElement('option');
+      option.value = String(room.roomIndex);
+      option.textContent = room.label;
+      option.selected = room.id === options.roomId;
+      this.roomSelect.append(option);
+    }
+
+    this.roomSelect.addEventListener('change', this.handleRoomChange);
+    roomSection.append(this.roomSelect);
+
     const selectionSection = this.createSection(document, 'SELECTION');
     this.selectionName = document.createElement('strong');
     this.selectionName.className = 'level-builder-selection-name';
@@ -66,10 +101,20 @@ export class LevelBuilderPanel {
     this.selectionDetails.className = 'level-builder-selection-details';
     const focusButton = this.createButton(document, 'FRAME SELECTED');
     focusButton.addEventListener('click', this.handleFocusSelection);
+    const objectToolbar = document.createElement('div');
+    objectToolbar.className = 'level-builder-toolbar';
+    this.duplicateButton = this.createButton(document, 'DUPLICATE OBJECT');
+    this.duplicateButton.addEventListener(
+      'click',
+      this.handleDuplicateSelection,
+    );
+    this.removeButton = this.createButton(document, 'REMOVE OBJECT', 'danger');
+    this.removeButton.addEventListener('click', this.handleRemoveSelection);
+    objectToolbar.append(focusButton, this.duplicateButton, this.removeButton);
     selectionSection.append(
       this.selectionName,
       this.selectionDetails,
-      focusButton,
+      objectToolbar,
     );
 
     const transformSection = this.createSection(document, 'TRANSFORM GIZMO');
@@ -88,7 +133,31 @@ export class LevelBuilderPanel {
       transformToolbar.append(button);
     }
 
-    transformSection.append(transformToolbar);
+    const snapLabel = document.createElement('label');
+    snapLabel.className = 'level-builder-select-control';
+    snapLabel.textContent = 'SNAPPING';
+    this.snapPresetSelect = document.createElement('select');
+    this.snapPresetSelect.setAttribute('aria-label', 'Snapping preset');
+
+    for (const [preset, label] of [
+      ['off', 'OFF'],
+      ['fine', 'FINE · 1 cm / 1°'],
+      ['normal', 'NORMAL · 5 cm / 5°'],
+      ['coarse', 'COARSE · 25 cm / 15°'],
+    ] as const satisfies readonly (readonly [LevelBuilderSnapPreset, string])[]) {
+      const option = document.createElement('option');
+      option.value = preset;
+      option.textContent = label;
+      option.selected = preset === 'normal';
+      this.snapPresetSelect.append(option);
+    }
+
+    this.snapPresetSelect.addEventListener(
+      'change',
+      this.handleSnapPresetChange,
+    );
+    snapLabel.append(this.snapPresetSelect);
+    transformSection.append(transformToolbar, snapLabel);
 
     const stateSection = this.createSection(document, 'BEFORE / AFTER');
     const stateToolbar = document.createElement('div');
@@ -195,6 +264,7 @@ export class LevelBuilderPanel {
 
     this.element.append(
       header,
+      roomSection,
       selectionSection,
       transformSection,
       stateSection,
@@ -230,6 +300,8 @@ export class LevelBuilderPanel {
       this.visibilityInput.checked = false;
       this.visibilityInput.disabled = true;
       this.colorInput.disabled = true;
+      this.duplicateButton.disabled = true;
+      this.removeButton.disabled = true;
     } else {
       const { object, reference } = selection;
       const rotationDegrees = object.rotation
@@ -249,6 +321,11 @@ export class LevelBuilderPanel {
       this.visibilityInput.checked = object.visible;
       const color = selection.after.materialColors[0]?.color;
       this.colorInput.disabled = color === undefined;
+      const canChangeObject =
+        reference.anomalyTargetId !== undefined ||
+        this.options.session.isAddition(object);
+      this.duplicateButton.disabled = !canChangeObject;
+      this.removeButton.disabled = !canChangeObject;
 
       if (color !== undefined) {
         this.colorInput.value = color;
@@ -275,6 +352,11 @@ export class LevelBuilderPanel {
     this.options.onTransformModeChange(mode);
   }
 
+  public rebuildSceneHierarchy(): void {
+    this.rebuildHierarchy();
+    this.refresh();
+  }
+
   public dispose(): void {
     this.visibilityInput.removeEventListener(
       'change',
@@ -282,6 +364,19 @@ export class LevelBuilderPanel {
     );
     this.colorInput.removeEventListener('input', this.handleColorInput);
     this.importInput.removeEventListener('change', this.handleImportFile);
+    this.roomSelect.removeEventListener('change', this.handleRoomChange);
+    this.snapPresetSelect.removeEventListener(
+      'change',
+      this.handleSnapPresetChange,
+    );
+    this.duplicateButton.removeEventListener(
+      'click',
+      this.handleDuplicateSelection,
+    );
+    this.removeButton.removeEventListener(
+      'click',
+      this.handleRemoveSelection,
+    );
     this.element.remove();
   }
 
@@ -374,6 +469,48 @@ export class LevelBuilderPanel {
 
   private readonly handleFocusSelection = (): void => {
     this.options.onFocusSelection();
+  };
+
+  private readonly handleDuplicateSelection = (): void => {
+    this.options.onDuplicateSelection();
+  };
+
+  private readonly handleRemoveSelection = (): void => {
+    this.options.onRemoveSelection();
+  };
+
+  private readonly handleSnapPresetChange = (): void => {
+    const preset = this.snapPresetSelect.value as LevelBuilderSnapPreset;
+
+    if (!(preset in LEVEL_BUILDER_SNAP_PRESETS)) {
+      this.setStatus('Unknown snapping preset.', true);
+      return;
+    }
+
+    this.options.onSnapPresetChange(preset);
+    this.setStatus(`Snapping set to ${preset.toUpperCase()}.`);
+  };
+
+  private readonly handleRoomChange = (): void => {
+    const roomIndex = Number(this.roomSelect.value);
+    const selectedRoom = this.options.rooms.find(
+      (room) => room.roomIndex === roomIndex,
+    );
+
+    if (selectedRoom === undefined || selectedRoom.id === this.options.roomId) {
+      return;
+    }
+
+    this.roomSelect.disabled = true;
+    this.setStatus(`Loading ${selectedRoom.label}…`);
+    void this.options.onRoomChange(roomIndex).catch((error: unknown) => {
+      this.roomSelect.value = String(
+        this.options.rooms.find((room) => room.id === this.options.roomId)
+          ?.roomIndex ?? 0,
+      );
+      this.roomSelect.disabled = false;
+      this.showError(error);
+    });
   };
 
   private readonly handleCaptureBefore = (): void => {
@@ -487,7 +624,7 @@ export class LevelBuilderPanel {
         `${document.roomId}-layout.json`,
       );
       this.setStatus(
-        `Exported ${document.objects.length} canonical object transforms.`,
+        `Exported ${document.objects.length} objects and ${document.additions.length} additions.`,
       );
     } catch (error: unknown) {
       this.showError(error);

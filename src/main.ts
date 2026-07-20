@@ -3,7 +3,9 @@ import "./styles/start-screen.css";
 import { GameApp, type GameAppElements } from "./app/GameApp";
 import type { PlatformAdapter } from "./platform/PlatformAdapter";
 import { PlatformManager } from "./platform/PlatformManager";
+import { CrazyGamesAdapter } from "./platform/adapters/CrazyGamesAdapter";
 import { StandaloneAdapter } from "./platform/adapters/StandaloneAdapter";
+import { registerServiceWorker } from "./pwa/registerServiceWorker";
 
 function getGameAppElements(): GameAppElements {
   const canvas = document.querySelector("#game-canvas");
@@ -83,6 +85,13 @@ function createPlatformAdapter(): PlatformAdapter {
   const configuredPlatform =
     import.meta.env.VITE_PLATFORM?.trim().toLowerCase() || "standalone";
 
+  if (configuredPlatform === "crazygames") {
+    return new CrazyGamesAdapter({
+      rewardedAdsEnabled:
+        import.meta.env.VITE_CRAZYGAMES_REWARDED_ADS === "true",
+    });
+  }
+
   if (configuredPlatform !== "standalone" && import.meta.env.DEV) {
     console.warn(
       `Unsupported VITE_PLATFORM "${configuredPlatform}"; using "standalone".`,
@@ -112,4 +121,5 @@ async function bootstrap(): Promise<void> {
   await gameApp.initialize();
 }
 
+registerServiceWorker();
 void bootstrap().catch(showBootError);

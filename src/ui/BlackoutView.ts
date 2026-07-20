@@ -9,6 +9,8 @@ interface LightSnapshot {
 export class BlackoutView {
   private readonly overlay: HTMLElement;
   private readonly lights: LightSnapshot[] = [];
+  private environmentScene: THREE.Scene | null = null;
+  private environmentIntensity = 1;
 
   public constructor(root: HTMLElement) {
     this.overlay = root.ownerDocument.createElement('div');
@@ -19,9 +21,11 @@ export class BlackoutView {
     root.append(this.overlay);
   }
 
-  public begin(lightRoot: THREE.Object3D): void {
+  public begin(lightRoot: THREE.Object3D, scene?: THREE.Scene): void {
     this.restoreLights();
     this.lights.length = 0;
+    this.environmentScene = scene ?? null;
+    this.environmentIntensity = scene?.environmentIntensity ?? 1;
     lightRoot.traverse((object) => {
       const light = object as THREE.Light;
 
@@ -39,6 +43,11 @@ export class BlackoutView {
     for (const { light, intensity } of this.lights) {
       light.intensity = intensity * snapshot.lightMultiplier;
     }
+
+    if (this.environmentScene !== null) {
+      this.environmentScene.environmentIntensity =
+        this.environmentIntensity * snapshot.lightMultiplier;
+    }
   }
 
   public reset(): void {
@@ -47,6 +56,8 @@ export class BlackoutView {
     this.overlay.style.opacity = '0';
     this.overlay.dataset.stage = 'idle';
     this.overlay.hidden = true;
+    this.environmentScene = null;
+    this.environmentIntensity = 1;
   }
 
   public dispose(): void {
@@ -57,6 +68,10 @@ export class BlackoutView {
   private restoreLights(): void {
     for (const { light, intensity } of this.lights) {
       light.intensity = intensity;
+    }
+
+    if (this.environmentScene !== null) {
+      this.environmentScene.environmentIntensity = this.environmentIntensity;
     }
   }
 }

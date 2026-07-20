@@ -221,11 +221,11 @@ describe('GreyboxCorridor', () => {
     const storyClockDisplay = room
       .getAnomalyTargetRegistry()
       .getById('wall-clock')
-      ?.object.getObjectByName('STORY_CorridorClock_0317');
+      ?.object.getObjectByName('STORY_CorridorClock_0304');
     expect(storyClockDisplay).toBeDefined();
     expect(storyClockDisplay?.position.toArray()).toEqual([0.022, 0, 0]);
     expect(storyClockDisplay?.rotation.y).toBeCloseTo(Math.PI / 2);
-    expect(storyClockDisplay?.children).toHaveLength(18);
+    expect(storyClockDisplay?.children).toHaveLength(23);
     expect(
       storyClockDisplay?.children.every((child) =>
         child.layers.isEnabled(RENDER_LAYERS.scene),

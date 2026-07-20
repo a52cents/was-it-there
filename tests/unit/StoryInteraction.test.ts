@@ -1,69 +1,67 @@
 import { describe, expect, it } from 'vitest';
-import { STORY_INTERACTION_CATALOG } from '../../src/content/story/StoryInteractionCatalog';
+import {
+  STORY_DISAPPEARANCE_PROTECTED_TARGET_IDS_BY_ROOM,
+  STORY_INTERACTION_CATALOG,
+} from '../../src/content/story/StoryInteractionCatalog';
 import { StoryInteractionRegistry } from '../../src/gameplay/story/StoryInteraction';
 
 describe('StoryInteractionRegistry', () => {
-  it('resolves examinable room objects only during authored Story phases', () => {
+  it('protects the bedroom radio and family photo from Story disappearances', () => {
+    expect(STORY_DISAPPEARANCE_PROTECTED_TARGET_IDS_BY_ROOM).toEqual({
+      'greybox-bedroom': ['radio', 'photo-frame'],
+      bathroom: ['mirror'],
+      office: ['desk-photo'],
+      kitchen: ['breakfast-table'],
+    });
+  });
+
+  it('unlocks every Story interaction only after anomaly search completes', () => {
     const registry = new StoryInteractionRegistry(
       STORY_INTERACTION_CATALOG,
     );
 
-    expect(
-      registry.resolve('greybox-bedroom', 'photo-frame', 'observation'),
-    ).toMatchObject({
-      id: 'bedroom-family-photo',
-      actionLabel: 'EXAMINE',
-      requiredEventIdBeforeExit: 'bedroom-empty-place',
-    });
-    expect(
-      registry.resolve('greybox-bedroom', 'photo-frame', 'room-complete'),
-    ).not.toBeNull();
-    expect(
-      registry.resolve('greybox-bedroom', 'photo-frame', 'search'),
-    ).toBeNull();
-    expect(
-      registry.resolve('greybox-bedroom', 'radio', 'observation'),
-    ).toMatchObject({
-      id: 'bedroom-radio',
-      actionLabel: 'EXAMINE',
-    });
-    expect(
-      registry.resolve('greybox-bedroom', 'wardrobe', 'room-complete'),
-    ).not.toBeNull();
-    expect(
-      registry.resolve('greybox-bedroom', 'television', 'search'),
-    ).toBeNull();
+    for (const interaction of STORY_INTERACTION_CATALOG) {
+      expect(interaction.phases).toEqual(['room-complete']);
+      expect(
+        registry.resolve(
+          interaction.roomId,
+          interaction.targetId,
+          'observation',
+        ),
+      ).toBeNull();
+      expect(
+        registry.resolve(
+          interaction.roomId,
+          interaction.targetId,
+          'search',
+        ),
+      ).toBeNull();
+      expect(
+        registry.resolve(
+          interaction.roomId,
+          interaction.targetId,
+          'room-complete',
+        ),
+      ).toMatchObject({ id: interaction.id });
+    }
+
     expect(registry.getExitRequirement('greybox-bedroom')).toMatchObject({
       id: 'bedroom-family-photo',
-      exitInstruction: 'EXAMINE THE ROOM',
+      exitInstruction: 'EXAMINE THE FAMILY PHOTO',
     });
-    expect(
-      registry.resolve('bathroom', 'mirror', 'observation'),
-    ).toMatchObject({
-      id: 'bathroom-mirror',
-      actionLabel: 'EXAMINE',
-      requiredEventIdBeforeExit: 'bathroom-mirror-inspection',
-    });
-    expect(
-      registry.resolve('bathroom', 'rubber-duck', 'room-complete'),
-    ).toMatchObject({
-      id: 'bathroom-rubber-duck',
-      actionLabel: 'EXAMINE',
-    });
-    expect(registry.resolve('bathroom', 'mirror', 'search')).toBeNull();
     expect(registry.getExitRequirement('bathroom')).toMatchObject({
       id: 'bathroom-mirror',
-      exitInstruction: 'EXAMINE THE ROOM',
+      exitInstruction: 'EXAMINE THE MIRROR',
     });
-    expect(
-      registry.resolve('first-corridor', 'phone', 'observation'),
-    ).toMatchObject({
-      id: 'corridor-phone',
-      actionLabel: 'ANSWER',
+    expect(registry.getExitRequirement('first-corridor')).toBeNull();
+    expect(registry.getExitRequirement('office')).toMatchObject({
+      id: 'office-desk-photo',
+      exitInstruction: 'EXAMINE THE DESK PHOTO',
     });
-    expect(
-      registry.resolve('first-corridor', 'phone', 'search'),
-    ).toBeNull();
+    expect(registry.getExitRequirement('kitchen')).toMatchObject({
+      id: 'kitchen-breakfast-table',
+      exitInstruction: 'COUNT THE PLACES',
+    });
   });
 
   it('rejects duplicate ids, bindings, and phase-less definitions', () => {

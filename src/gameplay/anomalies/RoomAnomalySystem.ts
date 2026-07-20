@@ -35,6 +35,7 @@ export interface PrepareRunBaselineOptions {
   readonly roomIndex: number;
   readonly roomId: string;
   readonly requiredVisibleTargetIds?: readonly string[];
+  readonly disappearanceProtectedTargetIds?: readonly string[];
 }
 
 export interface RoomBaselineSnapshot {
@@ -87,6 +88,7 @@ export class RoomAnomalySystem {
     string
   >();
   private readonly requiredVisibleTargetIds = new Set<string>();
+  private readonly disappearanceProtectedTargetIds = new Set<string>();
   private preparedBuilderCatalog: PreparedLevelBuilderCatalog | null = null;
   private collisionStateDirty = false;
   private readonly builderVariantsByTargetId = new Map<
@@ -157,6 +159,7 @@ export class RoomAnomalySystem {
     this.baselineColorVariantIdsByTargetId.clear();
     this.baselineRotationVariantIdsByTargetId.clear();
     this.requiredVisibleTargetIds.clear();
+    this.disappearanceProtectedTargetIds.clear();
 
     for (const targetId of options.requiredVisibleTargetIds ?? []) {
       if (this.registry.getById(targetId) === null) {
@@ -166,6 +169,16 @@ export class RoomAnomalySystem {
       }
 
       this.requiredVisibleTargetIds.add(targetId);
+    }
+
+    for (const targetId of options.disappearanceProtectedTargetIds ?? []) {
+      if (this.registry.getById(targetId) === null) {
+        throw new Error(
+          `Disappearance-protected Story target "${targetId}" is not registered in room "${options.roomId}".`,
+        );
+      }
+
+      this.disappearanceProtectedTargetIds.add(targetId);
     }
 
     const runSeed = normalizeSeed(options.runSeed);
@@ -314,6 +327,7 @@ export class RoomAnomalySystem {
     this.baselineColorVariantIdsByTargetId.clear();
     this.baselineRotationVariantIdsByTargetId.clear();
     this.requiredVisibleTargetIds.clear();
+    this.disappearanceProtectedTargetIds.clear();
     this.baselineSnapshot = null;
     this.restoreCanonicalState();
     this.flushCollisionStateChanges();
@@ -562,7 +576,9 @@ export class RoomAnomalySystem {
               variant.id === RESTORE_CANONICAL_ROTATION_VARIANT_ID) &&
             (startsHidden
               ? variant.kind === 'show'
-              : variant.kind !== 'show'),
+              : variant.kind !== 'show') &&
+            (!this.disappearanceProtectedTargetIds.has(target.id) ||
+              variant.kind !== 'hide'),
         );
         const weightMultiplier = startsHidden
           ? INITIAL_ABSENCE_WEIGHT_MULTIPLIER
@@ -583,7 +599,8 @@ export class RoomAnomalySystem {
           variants,
           weight: target.weight * weightMultiplier,
         };
-      });
+      })
+      .filter((target) => target.variants.length > 0);
   }
 
   private getPreparedVariants(
@@ -621,7 +638,10 @@ export class RoomAnomalySystem {
   }
 
   private canBeAbsentInBaseline(target: AnomalyTarget): boolean {
-    if (this.requiredVisibleTargetIds.has(target.id)) {
+    if (
+      this.requiredVisibleTargetIds.has(target.id) ||
+      this.disappearanceProtectedTargetIds.has(target.id)
+    ) {
       return false;
     }
 

@@ -82,6 +82,10 @@ describe('GreyboxBedroom', () => {
       'ARCH_Threshold_Exit',
       'ARCH_Window_West',
       'ARCH_Window_Glass',
+      'WALL_West_North',
+      'WALL_West_South',
+      'WALL_West_WindowBottom',
+      'WALL_West_WindowTop',
       'ARCH_Radiator_West',
       'ARCH_LightSwitch_Entrance',
       'ARCH_Outlet_North',
@@ -104,6 +108,13 @@ describe('GreyboxBedroom', () => {
     expect(floorTexture).toBeInstanceOf(THREE.DataTexture);
     expect(floorTexture?.name).toBe('TEXTURE_WoodFloor_Light');
     expect(floorTexture?.repeat.toArray()).toEqual([3, 4]);
+    const northWall = architecture?.getObjectByName('WALL_North') as
+      | THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>
+      | undefined;
+    expect(northWall?.material.map).toBeInstanceOf(THREE.DataTexture);
+    expect(northWall?.material.map?.name).toBe(
+      'TEXTURE_Bedroom_AgedPlaster',
+    );
     const floorImage = floorTexture?.image as
       | { readonly data?: unknown }
       | undefined;
@@ -161,7 +172,7 @@ describe('GreyboxBedroom', () => {
     expect(ceilingLight.target.position.toArray()).toEqual([0, 0.15, 0.2]);
   });
 
-  it('uses a warm readable light hierarchy with soft secondary fills', () => {
+  it('uses a warm focused light hierarchy with restrained secondary fills', () => {
     const visualRoot = room.getVisualRoot();
     const hemisphere = visualRoot.getObjectByName(
       'LIGHT_Ambient',
@@ -178,6 +189,9 @@ describe('GreyboxBedroom', () => {
     const windowFill = visualRoot.getObjectByName(
       'LIGHT_WindowFill',
     ) as THREE.DirectionalLight | undefined;
+    const windowArea = visualRoot.getObjectByName(
+      'LIGHT_WindowArea',
+    ) as THREE.RectAreaLight | undefined;
     const fixtureShade = visualRoot.getObjectByName(
       'ARCH_CeilingFixture_Shade',
     ) as
@@ -185,23 +199,26 @@ describe('GreyboxBedroom', () => {
       | undefined;
 
     expect(hemisphere).toBeInstanceOf(THREE.HemisphereLight);
-    expect(hemisphere?.color.getHex()).toBe(0xc9d7e3);
-    expect(hemisphere?.groundColor.getHex()).toBe(0x4a3930);
-    expect(hemisphere?.intensity).toBeCloseTo(0.68);
+    expect(hemisphere?.color.getHex()).toBe(0x94a1a5);
+    expect(hemisphere?.groundColor.getHex()).toBe(0x3b2d26);
+    expect(hemisphere?.intensity).toBeCloseTo(0.4);
     expect(roomBounce).toBeInstanceOf(THREE.AmbientLight);
-    expect(roomBounce?.intensity).toBeCloseTo(0.36);
+    expect(roomBounce?.intensity).toBeCloseTo(0.12);
     expect(ceiling).toBeInstanceOf(THREE.SpotLight);
     expect(ceiling?.color.getHex()).toBe(0xffc477);
-    expect(ceiling?.intensity).toBeCloseTo(7.2);
-    expect(ceiling?.angle).toBeCloseTo(Math.PI * 0.42);
-    expect(ceiling?.penumbra).toBeCloseTo(0.5);
+    expect(ceiling?.intensity).toBeCloseTo(6.4);
+    expect(ceiling?.angle).toBeCloseTo(Math.PI * 0.32);
+    expect(ceiling?.penumbra).toBeCloseTo(0.64);
     expect(ceilingBounce).toBeInstanceOf(THREE.PointLight);
-    expect(ceilingBounce?.intensity).toBeCloseTo(0.65);
+    expect(ceilingBounce?.intensity).toBeCloseTo(0.36);
     expect(ceilingBounce?.castShadow).toBe(false);
     expect(windowFill).toBeInstanceOf(THREE.DirectionalLight);
-    expect(windowFill?.color.getHex()).toBe(0xc6dcf2);
-    expect(windowFill?.intensity).toBeCloseTo(0.48);
+    expect(windowFill?.color.getHex()).toBe(0x829da6);
+    expect(windowFill?.intensity).toBeCloseTo(0.27);
     expect(windowFill?.castShadow).toBe(false);
+    expect(windowArea).toBeInstanceOf(THREE.RectAreaLight);
+    expect(windowArea?.intensity).toBeCloseTo(0.72);
+    expect([windowArea?.width, windowArea?.height]).toEqual([1.62, 1.18]);
     expect(fixtureShade?.material.emissive.getHex()).toBe(0xffb85c);
     expect(fixtureShade?.material.emissiveIntensity).toBeCloseTo(0.6);
   });

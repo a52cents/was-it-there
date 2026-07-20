@@ -1,3 +1,8 @@
+export interface RewardedAdLifecycle {
+  readonly onStarted?: () => void;
+  readonly onEnded?: () => void;
+}
+
 export interface PlatformAdapter {
   readonly id: string;
 
@@ -10,7 +15,8 @@ export interface PlatformAdapter {
   gameplayStop(): void;
 
   requestInterstitial(): Promise<void>;
-  requestRewardedAd(): Promise<boolean>;
+  isRewardedAdAvailable(): boolean;
+  requestRewardedAd(lifecycle?: RewardedAdLifecycle): Promise<boolean>;
 
   submitEscapeTime(timeMs: number): Promise<void>;
 
