@@ -2,7 +2,6 @@ import type {
   HousePressureLevel,
   HousePressureSnapshot,
 } from '../gameplay/story/HousePressureSystem';
-import { STORY_LOOP_ANCHOR } from '../content/story/StoryLoopAnchor';
 
 const PRESSURE_MESSAGES: Readonly<
   Partial<Record<HousePressureLevel, string>>
@@ -35,10 +34,10 @@ export class HousePressureView {
     failure.className = 'house-pressure-overlay__failure';
     this.failureMessage = document.createElement('p');
     this.failureMessage.className = 'house-pressure-overlay__message';
-    this.failureMessage.textContent = 'IT REMEMBERS YOU';
+    this.failureMessage.textContent = 'THE HOUSE IS ERASING THE ROOM';
     this.failureTime = document.createElement('p');
     this.failureTime.className = 'house-pressure-overlay__time';
-    this.failureTime.textContent = STORY_LOOP_ANCHOR.displayTime;
+    this.failureTime.textContent = 'RECONSTRUCTION SIGNAL LOST';
     failure.append(this.failureMessage, this.failureTime);
 
     this.announcement = document.createElement('div');
@@ -68,8 +67,56 @@ export class HousePressureView {
     this.element.style.backgroundColor = `rgb(2 3 4 / ${(snapshot.failureProgress * 0.88).toFixed(4)})`;
     this.vignette.style.opacity = snapshot.vignetteOpacity.toFixed(4);
     this.calmPulse.style.opacity = snapshot.calmIntensity.toFixed(4);
+    this.failureMessage.textContent =
+      snapshot.failureProgress >= 0.82
+        ? 'YOU HAVE BEEN ERASED'
+        : snapshot.failureProgress >= 0.55
+          ? 'YOU ARE NEXT'
+          : 'THE HOUSE IS ERASING THE ROOM';
     this.failureMessage.style.opacity = failureVisibility.toFixed(4);
     this.failureTime.style.opacity = timeVisibility.toFixed(4);
+  }
+
+  public applyErasureWarning(progress: number): void {
+    if (progress <= 0) {
+      this.resetErasureWarning();
+      return;
+    }
+
+    this.announcement.textContent = 'THE HOUSE IS ERASING THE ROOM.';
+    this.announcement.dataset.erasure = 'true';
+    delete this.announcement.dataset.pressure;
+    this.announcement.style.opacity = Math.min(1, progress * 2).toFixed(3);
+  }
+
+  public applyFailureFade(progress: number): void {
+    const normalized = Number.isFinite(progress)
+      ? Math.min(1, Math.max(0, progress))
+      : 0;
+    this.element.classList.remove('is-game-over-background');
+    this.element.style.backgroundColor = `rgb(0 0 0 / ${(0.88 + normalized * 0.12).toFixed(4)})`;
+    this.failureMessage.style.opacity = (1 - normalized).toFixed(4);
+    this.failureTime.style.opacity = (1 - normalized).toFixed(4);
+  }
+
+  public holdFailureBlack(): void {
+    this.element.classList.remove('is-failing');
+    this.element.classList.add('is-game-over-background');
+    this.element.style.backgroundColor = '#000';
+    this.vignette.style.opacity = '0';
+    this.calmPulse.style.opacity = '0';
+    this.failureMessage.style.opacity = '0';
+    this.failureTime.style.opacity = '0';
+  }
+
+  public resetErasureWarning(): void {
+    if (this.announcement.dataset.erasure !== 'true') {
+      return;
+    }
+
+    this.announcement.textContent = '';
+    this.announcement.style.opacity = '';
+    delete this.announcement.dataset.erasure;
   }
 
   public announcePressure(level: HousePressureLevel): void {
@@ -81,17 +128,22 @@ export class HousePressureView {
 
     this.announcement.textContent = message;
     this.announcement.dataset.pressure = String(level);
+    this.announcement.style.opacity = '';
+    delete this.announcement.dataset.erasure;
   }
 
   public reset(): void {
     this.element.classList.remove('is-failing');
+    this.element.classList.remove('is-game-over-background');
     this.element.style.backgroundColor = 'transparent';
     this.vignette.style.opacity = '0';
     this.calmPulse.style.opacity = '0';
     this.failureMessage.style.opacity = '0';
     this.failureTime.style.opacity = '0';
     this.announcement.textContent = '';
+    this.announcement.style.opacity = '';
     delete this.announcement.dataset.pressure;
+    delete this.announcement.dataset.erasure;
   }
 
   public dispose(): void {

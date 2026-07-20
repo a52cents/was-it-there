@@ -97,4 +97,57 @@ describe('StoryNotebookCatalog', () => {
       'kitchen-fourth-place',
     ]);
   });
+
+  it('records the evidence and final dining-room reconstruction', () => {
+    const entries = getUnlockedStoryNotebookEntries({
+      ...createEmptyStoryProgress(),
+      discoveries: [
+        'dining-previous-loop-voice',
+        'dining-bear-tag',
+        'dining-deletion-order',
+      ],
+      fragments: ['memory-dining-reconstruction'],
+    });
+
+    expect(entries.map((entry) => entry.id)).toEqual([
+      'observation-protocol',
+      'dining-previous-loop-voice',
+      'dining-bear-tag',
+      'dining-deletion-order',
+      'dining-reconstruction-truth',
+    ]);
+  });
+
+  it("records Noah's living-room evidence and the current route outcome", () => {
+    const entries = getUnlockedStoryNotebookEntries({
+      ...createEmptyStoryProgress(),
+      discoveries: ['living-noah-tape', 'living-noah-message'],
+      fragments: ['memory-noah-protection'],
+      chapterOutcomeIds: ['chapter-two-recording'],
+    });
+
+    expect(entries.map((entry) => entry.id)).toEqual([
+      'observation-protocol',
+      'living-noah-tape',
+      'living-noah-message',
+      'living-noah-protection',
+      'chapter-two-recording',
+    ]);
+  });
+
+  it('records the physical evidence left by discarded copies', () => {
+    const entries = getUnlockedStoryNotebookEntries({
+      ...createEmptyStoryProgress(),
+      discoveries: ['laundry-iteration-17'],
+      fragments: ['memory-discarded-copies'],
+      chapterOutcomeIds: ['chapter-two-copies'],
+    });
+
+    expect(entries.map((entry) => entry.id)).toEqual([
+      'observation-protocol',
+      'laundry-iteration-17',
+      'laundry-discarded-copies',
+      'chapter-two-copies',
+    ]);
+  });
 });

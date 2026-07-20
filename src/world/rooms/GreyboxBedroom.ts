@@ -708,6 +708,13 @@ export class GreyboxBedroom extends RoomRuntime implements PlayableRoom {
 
   public async loadAssets(assetManager?: AssetManager): Promise<void> {
     await this.loadFinalDecor(assetManager);
+    const manager = this.finalAssetManager;
+
+    if (manager === null) {
+      throw new Error('The bedroom AssetManager is unavailable.');
+    }
+
+    await this.loadHouseShellAssets(manager, 'bedroom');
   }
 
   public setExitDoorCollisionEnabled(enabled: boolean): void {

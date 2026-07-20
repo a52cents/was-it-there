@@ -117,6 +117,10 @@ export type StoryEffectDefinition =
       readonly fragmentId: string;
     }
   | {
+      readonly type: 'add-ending';
+      readonly endingId: string;
+    }
+  | {
       readonly type: 'set-flag';
       readonly flagId: string;
       readonly value: StoryFlagValue;
@@ -280,6 +284,8 @@ function validateEffect(
         return [['discovery id', effect.discoveryId]];
       case 'add-fragment':
         return [['fragment id', effect.fragmentId]];
+      case 'add-ending':
+        return [['ending id', effect.endingId]];
       case 'set-flag':
         assertFiniteFlagNumber(eventId, effect.value);
         return [['flag id', effect.flagId]];

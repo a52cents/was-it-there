@@ -14,6 +14,9 @@ import {
 
 export type LevelBuilderTransformMode = 'translate' | 'rotate' | 'scale';
 
+export const LEVEL_BUILDER_DEFAULT_EDITOR_BRIGHTNESS = 0.65;
+export const LEVEL_BUILDER_MAX_EDITOR_BRIGHTNESS = 2;
+
 export interface LevelBuilderRoomOption {
   readonly roomIndex: number;
   readonly id: string;
@@ -29,6 +32,7 @@ export interface LevelBuilderPanelOptions {
   readonly onSelectObject: (object: THREE.Object3D) => void;
   readonly onTransformModeChange: (mode: LevelBuilderTransformMode) => void;
   readonly onSnapPresetChange: (preset: LevelBuilderSnapPreset) => void;
+  readonly onEditorBrightnessChange: (brightness: number) => void;
   readonly onDuplicateSelection: () => void;
   readonly onRemoveSelection: () => void;
   readonly onRoomChange: (roomIndex: number) => Promise<void>;
@@ -47,6 +51,8 @@ export class LevelBuilderPanel {
   >();
   private readonly roomSelect: HTMLSelectElement;
   private readonly snapPresetSelect: HTMLSelectElement;
+  private readonly brightnessInput: HTMLInputElement;
+  private readonly brightnessValue: HTMLOutputElement;
   private readonly duplicateButton: HTMLButtonElement;
   private readonly removeButton: HTMLButtonElement;
   private readonly visibilityInput: HTMLInputElement;
@@ -92,6 +98,39 @@ export class LevelBuilderPanel {
 
     this.roomSelect.addEventListener('change', this.handleRoomChange);
     roomSection.append(this.roomSelect);
+
+    const lightingSection = this.createSection(document, 'EDITOR LIGHT');
+    const brightnessControl = document.createElement('label');
+    brightnessControl.className = 'level-builder-light-control';
+    const brightnessLabel = document.createElement('span');
+    brightnessLabel.textContent = 'EXTRA BRIGHTNESS';
+    this.brightnessValue = document.createElement('output');
+    this.brightnessInput = document.createElement('input');
+    this.brightnessInput.type = 'range';
+    this.brightnessInput.min = '0';
+    this.brightnessInput.max = String(LEVEL_BUILDER_MAX_EDITOR_BRIGHTNESS);
+    this.brightnessInput.step = '0.05';
+    this.brightnessInput.value = String(
+      LEVEL_BUILDER_DEFAULT_EDITOR_BRIGHTNESS,
+    );
+    this.brightnessInput.setAttribute(
+      'aria-label',
+      'Extra editor brightness',
+    );
+    this.brightnessInput.addEventListener(
+      'input',
+      this.handleBrightnessInput,
+    );
+    brightnessControl.append(
+      brightnessLabel,
+      this.brightnessValue,
+      this.brightnessInput,
+    );
+    const brightnessHelp = document.createElement('small');
+    brightnessHelp.className = 'level-builder-light-help';
+    brightnessHelp.textContent = 'Preview only — never saved in the level.';
+    lightingSection.append(brightnessControl, brightnessHelp);
+    this.updateBrightnessValue(LEVEL_BUILDER_DEFAULT_EDITOR_BRIGHTNESS);
 
     const selectionSection = this.createSection(document, 'SELECTION');
     this.selectionName = document.createElement('strong');
@@ -265,6 +304,7 @@ export class LevelBuilderPanel {
     this.element.append(
       header,
       roomSection,
+      lightingSection,
       selectionSection,
       transformSection,
       stateSection,
@@ -368,6 +408,10 @@ export class LevelBuilderPanel {
     this.snapPresetSelect.removeEventListener(
       'change',
       this.handleSnapPresetChange,
+    );
+    this.brightnessInput.removeEventListener(
+      'input',
+      this.handleBrightnessInput,
     );
     this.duplicateButton.removeEventListener(
       'click',
@@ -490,6 +534,21 @@ export class LevelBuilderPanel {
     this.options.onSnapPresetChange(preset);
     this.setStatus(`Snapping set to ${preset.toUpperCase()}.`);
   };
+
+  private readonly handleBrightnessInput = (): void => {
+    const brightness = THREE.MathUtils.clamp(
+      Number(this.brightnessInput.value),
+      0,
+      LEVEL_BUILDER_MAX_EDITOR_BRIGHTNESS,
+    );
+
+    this.updateBrightnessValue(brightness);
+    this.options.onEditorBrightnessChange(brightness);
+  };
+
+  private updateBrightnessValue(brightness: number): void {
+    this.brightnessValue.value = `+${Math.round(brightness * 100)}%`;
+  }
 
   private readonly handleRoomChange = (): void => {
     const roomIndex = Number(this.roomSelect.value);

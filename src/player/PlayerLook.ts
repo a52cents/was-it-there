@@ -14,6 +14,7 @@ function normalizeYaw(yaw: number): number {
 export class PlayerLook {
   private yaw = 0;
   private pitch = 0;
+  private sensitivityMultiplier = 1;
 
   public constructor(
     private readonly input: PointerInput,
@@ -33,15 +34,26 @@ export class PlayerLook {
     // pitch from introducing roll.
     if (Number.isFinite(pointerDelta.x)) {
       this.yaw = normalizeYaw(
-        this.yaw - pointerDelta.x * this.config.mouseSensitivity,
+        this.yaw -
+          pointerDelta.x *
+            this.config.mouseSensitivity *
+            this.sensitivityMultiplier,
       );
     }
 
     if (Number.isFinite(pointerDelta.y)) {
       this.pitch = this.clampPitch(
-        this.pitch - pointerDelta.y * this.config.mouseSensitivity,
+        this.pitch -
+          pointerDelta.y *
+            this.config.mouseSensitivity *
+            this.sensitivityMultiplier,
       );
     }
+  }
+
+  public setSensitivityMultiplier(multiplier: number): void {
+    this.sensitivityMultiplier =
+      Number.isFinite(multiplier) && multiplier > 0 ? multiplier : 1;
   }
 
   public reset(yaw = 0, pitch = 0): void {

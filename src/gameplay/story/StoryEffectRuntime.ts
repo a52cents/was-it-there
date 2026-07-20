@@ -73,6 +73,7 @@ export class StoryEffectRuntime {
         break;
       case 'add-discovery':
       case 'add-fragment':
+      case 'add-ending':
       case 'set-flag':
         break;
       case 'lighting-preset':

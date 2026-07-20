@@ -2,8 +2,8 @@
 
 ## Story Mode Design Bible — Version 0.1
 
-**Status:** approved direction, kitchen epilogue implemented
-**Scope:** first complete story slice across the first five built rooms
+**Status:** complete ten-room Story route implemented, including three explicit endings
+**Scope:** ten built gameplay rooms; visual layouts remain replaceable through the Level Builder
 **Modes:** `STORY` and `ESCAPE` remain separate  
 **Default game language:** English, with content structured for later localization
 
@@ -20,11 +20,13 @@ The additional systems give those actions a narrative meaning:
 - the house rebuilds its memories incorrectly;
 - the player uses observation to resist those false memories;
 - mistakes increase the house's control over the current room;
-- failure restarts the night at 03:04;
+- failure lets the house erase the room and the player before rebuilding the
+  night at 03:04;
 - knowledge survives even when the physical house resets.
 
-The first story slice ends after the kitchen. It must feel like a complete first
-chapter while leaving the final resolution for the future ten-room route.
+Chapter One closes after the dining room. Chapter Two continues through the
+Living Room, Laundry Room, Entrance Corridor, and Main Hall, where the player
+opens the archive and makes one of three explicit final choices.
 
 ---
 
@@ -117,6 +119,13 @@ resident, an intruder, or another reconstruction. A voice on the radio warns
 that the house is forgetting someone. The only way forward is to identify the
 details that do not belong.
 
+Each report is therefore part of the reconstruction test. A correct anomaly
+report rejects a contradiction in the archive and stabilizes Subject 04 long
+enough to enter the next memory. Errors convince the house that the current
+copy is incomplete. When the search timer expires repeatedly, it removes the
+room around the player, erases the failed copy, and rebuilds the loop. This is
+the narrative reason for observation, reporting, locked exits, and Game Over.
+
 The first chapter establishes four facts:
 
 1. Someone has been removed from the family memory.
@@ -142,16 +151,27 @@ One loop follows this sequence:
 6. During full black, the player returns to the room entry position.
 7. Search therefore begins from a stable, fair reference point.
 8. Correct and incorrect reports make the house react.
-9. The office revelation leads into the kitchen epilogue.
-10. Crossing the kitchen exit completes the first chapter.
-11. A third error triggers a room-specific failure sequence.
-12. The physical route resets to the bedroom.
-13. The loop counter and narrative discoveries persist.
+9. The office revelation leads into the kitchen evidence.
+10. The dining room asks the player to reconstruct the last dinner in three steps.
+11. Crossing the dining-room exit completes the first chapter and opens the
+    Living Room.
+12. The Living Room asks the player to find Noah's cassette, play it, and use
+    its signal to reveal the television recording.
+13. The Laundry Room traces numbered clothes from earlier Subject 04 copies.
+14. The Entrance Corridor reveals that the apparent front door returns failed copies.
+15. The Main Hall exposes the archive and requires an explicit final choice.
+16. Crossing the real hall exit resolves `ESCAPE`, `REMEMBER`, or `REPLACED`.
+17. In the final portion of each search timer, the house begins erasing
+    non-anomalous objects. The active anomaly remains available until the end.
+18. Each timeout advances the erasure instead of visually resetting it.
+19. A third error erases the remaining room, then the player.
+20. The physical route resets to the bedroom.
+21. The loop counter and narrative discoveries persist.
 
-For the five-room slice, a complete successful loop should remain short enough
+For the ten-room route, a complete successful loop should remain short enough
 that restarting from the bedroom is meaningful rather than exhausting.
 
-When the route grows to ten rooms, the restart cost must be playtested again.
+The ten-room restart cost must be playtested again.
 Fast-forwarding mastered introductory beats may be added, but automatic room
 checkpoints are not part of the first implementation.
 
@@ -208,9 +228,12 @@ change ambience, overlays, or non-reportable helper objects.
 
 ### During search
 
-A story event must never move, recolor, hide, reveal, rotate, or rescale a
-reportable target. Story interactions remain disabled until every anomaly has
-been reported.
+Story interactions remain disabled until every anomaly has been reported.
+The only narrative exception allowed to alter reportable objects is the clearly
+announced end-of-timer erasure: it removes targets that are not part of the
+active anomaly first. Active anomaly targets remain selectable and visible
+until the fatal takeover. The erasure never moves, recolors, rotates, or
+rescales an object, so it cannot imitate those anomaly types.
 
 ### After room completion
 
@@ -424,7 +447,7 @@ The same physical prop may still be an anomaly target. Story interaction must
 not change its anomaly snapshot, and search mode always gives reporting
 priority.
 
-A single carried `memory object` may be explored after the five-room slice is
+A single carried `memory object` may be explored after the six-room slice is
 validated. It is not required for the first chapter implementation.
 
 ---
@@ -443,10 +466,10 @@ Authored beats:
 
 1. Loop opening displays `03:04`.
 2. A short radio burst begins during observation.
-3. After the anomaly search, the room objective asks for the family photo.
-4. Examining it reveals that its composition leaves an unnatural gap and lets
-   the radio finish its message.
-5. In Story, the exit remains locked until the family photo has been examined
+3. After the anomaly search, the objective first asks the player to tune the
+   radio, then examine the family photo.
+4. The radio frequency makes the missing person readable in the photograph.
+5. In Story, the exit remains locked until both clues have been followed
    during the current loop.
 
 Provisional English copy:
@@ -463,7 +486,7 @@ Failure presentation:
 
 - the radio searches rapidly through empty frequencies;
 - practical lights extinguish toward the player;
-- the final radio click cuts to 03:04.
+- the final radio click begins the common room-and-player erasure.
 
 No new external asset is required. A simple non-reportable clock display may be
 created from existing UI or primitive geometry if the physical room needs it.
@@ -483,8 +506,8 @@ Purpose:
 Authored beats:
 
 1. Observation displays `MEMORIZE THE ROOM` and accepts no interaction.
-2. Once every anomaly is found, the mirror becomes the required examination;
-   interacting with it displays its
+2. Once every anomaly is found, the player counts four toothbrushes before the
+   mirror becomes the required examination; interacting with it displays its
    warning as a subtitle without changing the mirror visually.
 3. The bathtub, vanity, toothbrush cup, rubber duck, candle, and folded towels
    expose optional strange descriptions and connected easter eggs.
@@ -506,7 +529,7 @@ Failure presentation:
 
 - condensation rapidly covers the view without a face or jumpscare;
 - water audio cuts to silence;
-- 03:04 appears through the fog.
+- the fog is overtaken by the common room-and-player erasure.
 
 The mirror warning is subtitle-only and never modifies the anomaly target or
 adds a helper mesh. The separate third-error presentation can still use its
@@ -526,9 +549,10 @@ Authored beats:
 
 1. The wall clock visibly establishes 03:04 as part of the normal baseline.
 2. The telephone rings during observation.
-3. After the anomaly search, answering it optionally plays a short, subtitled
-   prediction; the corridor has no required Story objective.
-4. The predicted sound or phrase occurs later in the office.
+3. After the anomaly search, examining the wall clock is required and reveals
+   that Subject 04 already crossed the corridor.
+4. Answering the phone remains optional and plays a short prediction.
+5. The predicted sound or phrase occurs later in the office.
 
 Provisional English copy:
 
@@ -542,7 +566,7 @@ Failure presentation:
 
 - every ring moves closer through spatial audio while the phone remains still;
 - the final ring comes from behind the player;
-- the screen cuts to 03:04 without showing a creature.
+- the common erasure takes the corridor, then the player, without a creature.
 
 The telephone and clock remain valid anomaly targets. Ringing them cannot
 change transform, visibility, color, scale, or anomaly material state.
@@ -566,9 +590,9 @@ Authored beats:
 
 1. The office radio repeats the frequency pattern from the bedroom.
 2. If the corridor call was answered, the predicted silence occurs.
-3. After the anomaly search, examining the required desk photo reveals an
-   erased name.
-4. Room completion opens the route into the kitchen.
+3. After the anomaly search, the player traces the signal through the radio,
+   wakes the 03:04 wall clock, then examines the desk photo.
+4. The completed chain reveals the erased name and opens the kitchen.
 
 Provisional English copy:
 
@@ -583,7 +607,7 @@ Failure presentation:
 
 - the radio addresses the player with an incomplete or distorted name;
 - office lights isolate the desk photo;
-- the image darkens and resolves to 03:04.
+- the image darkens as the common erasure reaches the player.
 
 The first implementation should reuse the existing office radio, phone, clock,
 and photo bindings. A document may be represented by a lightweight
@@ -595,16 +619,16 @@ Purpose:
 
 - confirm the office revelation through an ordinary family ritual;
 - make the room feel predictive rather than simply haunted;
-- close the first slice with a distinct domestic memory.
+- lead into the final dining-room reconstruction with a domestic memory.
 
 Authored beats:
 
 1. The microwave and toaster play the end of breakfast before anyone sits down.
 2. A chair is heard scraping while every visible object remains still.
 3. Appliances contain optional evidence dated tomorrow.
-4. After the anomaly search, counting the places reveals three served meals
-   and a fourth place removed before service.
-5. Room completion resolves the chapter according to collected fragments.
+4. After the anomaly search, a discarded receipt establishes that four meals
+   were served; the player then counts the four places at the table.
+5. Room completion opens the dining room, where the evidence can be resolved.
 
 The breakfast table cannot disappear in Story because it carries the required
 counting interaction. Its other anomaly types follow the kitchen catalogue.
@@ -616,8 +640,7 @@ Provisional English copy:
 Supporting fragment:
 
 `memory-kitchen-fourth-place` — The family continued preparing a place for the
-erased resident. This reinforces the four core memories without changing the
-first-chapter outcome requirement.
+erased resident.
 
 Failure presentation:
 
@@ -625,42 +648,135 @@ Failure presentation:
 - the service ticket changes the fourth place from removed to accepted;
 - the house begins to “prepare” the player as the missing course.
 
+### 13.6 Dining room — The reconstruction
+
+Purpose:
+
+- turn the accumulated clues into a playable conclusion;
+- identify Elise Vale and explain the 03:04 loop;
+- reveal that the player is a reconstruction rather than the original resident;
+- pay off the optional corridor call as a message from an earlier loop.
+
+After the anomaly search, the exit remains locked while the player reconstructs
+the last dinner in three readable steps:
+
+1. Read the tag on Noah's bear. Elise's handwriting identifies the family.
+2. Use that clue to open the sideboard record and read Dr. Adrian Vale's order
+   to remove his deceased daughter from the domestic archive.
+3. Return to the fourth place at the table and complete the memory.
+
+The final record states that Elise died in the fire at 03:04. The player is a
+copy assembled from photographs, routines, reflections, family residue and
+earlier failed reconstructions. If the corridor call was answered, the dining
+room also confirms that the caller used the player's own voice because it was
+one of those previous copies.
+
+Core fragment:
+
+`memory-dining-reconstruction` — The player understands what they are and why
+the house repeatedly tests their memory.
+
+Failure presentation:
+
+- the archive labels Subject 04 incomplete;
+- the reconstruction record is erased;
+- the loop restarts at 03:04.
+
 ---
 
 ## 14. Chapter outcomes and full endings
 
-### First chapter outcomes
+### Current playable route
 
-The kitchen exit currently ends the built Story route. Story Mode replaces the normal
-victory copy with one of two chapter outcomes:
+The dining-room exit ends Chapter One, then opens the complete Chapter Two
+route: Living Room, Laundry Room, Entrance Corridor, and Main Hall. The
+Entrance Corridor's front door is false. The Main Hall contains the archive,
+the real final exit, and three physical choice targets.
 
-#### `CHAPTER ESCAPED`
+The first-chapter result is still resolved and saved in one of two forms:
+
+#### `CHAPTER ONE SURVIVED` (`chapter-escaped` save id)
 
 Condition:
 
-- kitchen completed;
-- fewer than four core fragments discovered.
+- dining-room reconstruction completed;
+- fewer than six core fragments discovered.
 
 Meaning:
 
-The player escaped the reconstructed section but does not understand the loop.
+The player understands that they are Elise's reconstruction and survived the
+inner route, but did not trace the warning voice back through previous loops.
+The house itself has not been escaped.
 
 #### `CHAPTER REMEMBERED`
 
 Condition:
 
-- kitchen completed;
-- all four core fragments discovered.
+- dining-room reconstruction completed;
+- all six core fragments discovered, including the optional corridor warning.
 
 Meaning:
 
-The player understands that their identity is connected to the erased resident.
+The player understands Elise's death, Adrian's deletion order, their own nature
+as Subject 04, and the fact that previous copies carried warnings between loops.
 
-Both outcomes unlock a replay option and remain recorded in the notebook.
+Both outcomes unlock Escape Mode and remain recorded in the notebook. The
+legacy `chapter-escaped` identifier is retained for save compatibility, but its
+copy must never imply that the player left the whole house. These chapter
+outcomes persist as discoveries, while the Main Hall supplies the final ending.
+
+### Chapter Two — Who kept rebuilding Elise?
+
+Chapter One answers **what the player is**. Chapter Two must answer **why the
+loop continues** and give the player agency over its ending.
+
+The house is a domestic memory archive caught between two incompatible orders:
+family routines keep reconstructing Elise, while Adrian Vale's deletion order
+commands it to remove Subject 04. It erases every imperfect copy and starts
+again at the instant of Elise's death. This preserves the house as the active
+antagonist without reducing Adrian to a simple villain.
+
+#### Room 7 — Living Room: The recording (implemented)
+
+- First playable room after the dining-room chapter boundary.
+- A family recording reveals that Noah kept replaying Elise's voice and feeding
+  memories back into the archive after Adrian ordered the deletion.
+- Objective: locate the labelled cassette, play it, then reveal its synchronized
+  message on the television.
+- Revelation: the loop survives because love and grief keep contradicting the
+  deletion order.
+
+#### Room 8 — Laundry Room: The discarded copies (implemented)
+
+- Clothes, tags, and ash-marked personal effects carry successive Subject 04
+  iteration numbers.
+- Objective direction: follow matching garment labels through washer, drying
+  rack, and disposal bin.
+- Revelation: earlier reconstructions became physically present in the house;
+  they were erased here when they failed.
+- Current implementation: read iteration 17 on the washer, match iterations 18
+  through 26 on the drying rack, then open the disposal bin to recover the
+  `memory-discarded-copies` fragment.
+
+#### Room 9 — Entrance Corridor: The false exit
+
+- The front door appears reachable, but evidence from earlier copies proves it
+  has been routing failed subjects back to the bedroom.
+- Objective direction: reconstruct the path of a previous copy from intercom,
+  clock, and door records.
+- Revelation: the telephone caller was an earlier Elise-copy that redirected
+  its last signal through the house before being erased.
+
+#### Room 10 — Main Hall: The choice
+
+- The Main Hall contains the archive core and the real front door.
+- Anomaly play remains required, followed by a short, explicit final choice.
+- The player's collected memories determine which choices can be understood,
+  but no ending is selected by a hidden score.
 
 ### Full-route endings
 
-The ending framework must eventually support:
+The ending framework supports:
 
 #### `ESCAPE`
 
@@ -679,7 +795,11 @@ deliberately accept the false identity it presents.
 `REPLACED` must be the result of a readable player choice, not a punishment for
 ordinary errors or a hidden numerical threshold.
 
-The final ending scenes are out of scope until the main hall exists.
+`REMEMBER` means restoring Elise's truthful record so the archive can stop
+rebuilding her; the player remains a reconstruction rather than magically
+becoming the original Elise. `REPLACED` means knowingly accepting the false
+family slot offered by the house. Each result has distinct final-screen copy
+and is persisted in Story progress.
 
 ---
 
@@ -723,7 +843,7 @@ transition behavior must be explicit during the final error reaction.
 
 ## 17. First-slice exclusions
 
-Do not add during the five-room story slice:
+Do not add during the six-room story slice:
 
 - combat;
 - enemy or family character AI;
@@ -750,14 +870,15 @@ The first Story chapter is acceptable when:
 - the Escape unlock survives a page reload;
 - Escape behaves identically to its pre-Story version;
 - each built room contains one clear authored narrative beat;
-- all four core fragments can be discovered in one loop;
+- all six core fragments can be discovered in one loop;
 - missing an optional interaction does not block room progression;
 - the third error produces a short reversible failure sequence;
 - a failed Story loop restarts in the bedroom at 03:04;
 - notebook discoveries survive reload and loop reset;
 - anomaly generation remains deterministic;
 - every blackout returns the player to the active room spawn while fully dark;
-- no story effect creates a false reportable change;
+- the end-of-timer erasure is announced and never removes an active anomaly
+  before the fatal takeover;
 - every transient room effect is restored on restart and transition;
 - pause, pointer-lock loss, and hidden tabs cannot advance events;
 - all essential audio information is subtitled;
@@ -776,10 +897,12 @@ After approval of this document, implementation proceeds in this order:
 4. House Pressure reactions and failure state;
 5. bedroom vertical slice;
 6. persistent Story progress and notebook;
-7. bathroom content;
-8. corridor content;
-9. office content and chapter outcomes;
-10. accessibility, restoration audit, and final validation.
+7. bathroom and corridor content;
+8. office, kitchen, and dining-room chapter conclusion;
+9. accessibility, restoration audit, and Chapter One validation;
+10. Living Room continuation (implemented);
+11. Laundry Room and Entrance Corridor escalation (implemented);
+12. Main Hall and the three full-route endings (implemented).
 
 No later step should begin while the preceding slice has known progression,
 restoration, or ambiguity bugs.

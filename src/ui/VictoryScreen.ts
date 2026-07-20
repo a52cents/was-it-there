@@ -108,12 +108,32 @@ export class VictoryScreen {
       ? null
       : {
           'chapter-escaped': {
-            title: 'CHAPTER ESCAPED',
-            body: 'You escaped the reconstruction. One memory is still missing.',
+            title: 'CHAPTER ONE SURVIVED',
+            body: 'The dining room confirms that you are a reconstruction of Elise Vale. The route beyond is still sealed, and the voice guiding the earlier loops remains unresolved.',
           },
           'chapter-remembered': {
             title: 'CHAPTER REMEMBERED',
-            body: 'All four memories agree: the house erased you on purpose.',
+            body: 'Elise died at 03:04. Her father ordered the archive erased, but the house rebuilt you anyway. Earlier copies guided this loop; the route beyond the dining room still waits.',
+          },
+          'chapter-two-recording': {
+            title: 'THE RECORDING SURVIVED',
+            body: "Noah's message proves the house is not rebuilding Elise by accident. Someone inside the archive is keeping her alive. The route toward the laundry room is still forming.",
+          },
+          'chapter-two-copies': {
+            title: 'THE COPIES WERE HERE',
+            body: 'The ash-marked clothing proves that earlier reconstructions became physical before the house erased them. Their trail continues toward the entrance corridor and its false front door.',
+          },
+          'ending-escape': {
+            title: 'ENDING — A LIFE OF YOUR OWN',
+            body: 'You erased the reconstruction route and left the archive intact only as memory. Elise remains dead, but the person the house created walks beyond it under her own name.',
+          },
+          'ending-remember': {
+            title: 'ENDING — ELISE REMEMBERED',
+            body: 'You restored every archived memory, including the fire. Whether that makes you Elise or her perfect successor no longer matters: you chose to carry her life forward.',
+          },
+          'ending-replaced': {
+            title: 'ENDING — THE NEW HOUSE',
+            body: 'You accepted the archive and became its living memory. The loop ends because the house no longer reconstructs Elise; it now rebuilds every room around you.',
           },
         }[summary.storyOutcome];
     this.title.textContent = outcomeCopy?.title ?? ENGLISH_COPY.victory;

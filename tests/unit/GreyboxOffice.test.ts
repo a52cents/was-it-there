@@ -121,7 +121,7 @@ describe('GreyboxOffice', () => {
     const uniqueAssetIds = new Set(
       Object.values(OFFICE_ASSET_CATALOG).map(({ id }) => id),
     );
-    expect(load).toHaveBeenCalledTimes(uniqueAssetIds.size);
+    expect(load).toHaveBeenCalledTimes(uniqueAssetIds.size + 3);
     expect(room.getLoadedAssetIds()).toHaveLength(18);
     expect(new Set(room.getLoadedAssetIds())).toEqual(uniqueAssetIds);
     expect(room.getAnomalyTargets()).toHaveLength(18);

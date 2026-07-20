@@ -27,6 +27,15 @@ export const STORY_AUDIO_CUE_IDS = [
   'story-kitchen-reverse-breakfast',
   'story-kitchen-chair-scrape',
   'story-kitchen-failure',
+  'story-dining-voices',
+  'story-dining-memory-pulse',
+  'story-dining-archive',
+  'story-dining-failure',
+  'story-living-tape-wind',
+  'story-living-tape-click',
+  'story-living-noah-voice',
+  'story-living-memory-burst',
+  'story-living-failure',
 ] as const;
 
 export type StoryAudioCueId = (typeof STORY_AUDIO_CUE_IDS)[number];
@@ -400,6 +409,105 @@ export class AudioManager {
           category: 'effects',
           type: 'sawtooth',
           startFrequency: 912,
+          endFrequency: 30.4,
+          durationSeconds: 3.04,
+          maximumVolume: 0.018,
+        });
+        break;
+      case 'story-dining-voices':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'triangle',
+          startFrequency: 228,
+          endFrequency: 114,
+          durationSeconds: 2.4,
+          maximumVolume: 0.016,
+        });
+        break;
+      case 'story-dining-memory-pulse':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'sine',
+          startFrequency: 304,
+          endFrequency: 152,
+          durationSeconds: 0.72,
+          maximumVolume: 0.022,
+        });
+        break;
+      case 'story-dining-archive':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'square',
+          startFrequency: 608,
+          endFrequency: 76,
+          durationSeconds: 1.8,
+          maximumVolume: 0.014,
+        });
+        break;
+      case 'story-dining-failure':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'sawtooth',
+          startFrequency: 1_216,
+          endFrequency: 30.4,
+          durationSeconds: 3.04,
+          maximumVolume: 0.018,
+        });
+        break;
+      case 'story-living-tape-wind':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'sawtooth',
+          startFrequency: 92,
+          endFrequency: 146,
+          durationSeconds: 1.6,
+          maximumVolume: 0.012,
+        });
+        break;
+      case 'story-living-tape-click':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'square',
+          startFrequency: 420,
+          endFrequency: 84,
+          durationSeconds: 0.18,
+          maximumVolume: 0.018,
+        });
+        break;
+      case 'story-living-noah-voice':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'triangle',
+          startFrequency: 196,
+          endFrequency: 98,
+          durationSeconds: 3.04,
+          maximumVolume: 0.016,
+        });
+        break;
+      case 'story-living-memory-burst':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'sine',
+          startFrequency: 304,
+          endFrequency: 76,
+          durationSeconds: 1.45,
+          maximumVolume: 0.022,
+        });
+        break;
+      case 'story-living-failure':
+        this.playToneCue({
+          id,
+          category: 'effects',
+          type: 'sawtooth',
+          startFrequency: 760,
           endFrequency: 30.4,
           durationSeconds: 3.04,
           maximumVolume: 0.018,

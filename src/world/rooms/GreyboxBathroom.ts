@@ -439,6 +439,17 @@ export class GreyboxBathroom extends RoomRuntime implements PlayableRoom {
   }
 
   public async loadAssets(assetManager?: AssetManager): Promise<void> {
+    await this.loadBathroomAssets(assetManager);
+    const manager = this.assetManager;
+
+    if (manager === null) {
+      throw new Error('The bathroom AssetManager is unavailable.');
+    }
+
+    await this.loadHouseShellAssets(manager, 'bathroom');
+  }
+
+  private async loadBathroomAssets(assetManager?: AssetManager): Promise<void> {
     if (!this.isMounted()) {
       throw new Error('The bathroom must be mounted before loading assets.');
     }

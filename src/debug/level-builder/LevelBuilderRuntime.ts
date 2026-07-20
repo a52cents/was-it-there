@@ -10,6 +10,8 @@ import {
   type LevelBuilderObjectState,
 } from './LevelBuilderDocument';
 import {
+  LEVEL_BUILDER_DEFAULT_EDITOR_BRIGHTNESS,
+  LEVEL_BUILDER_MAX_EDITOR_BRIGHTNESS,
   LevelBuilderPanel,
   type LevelBuilderRoomOption,
   type LevelBuilderTransformMode,
@@ -45,6 +47,7 @@ export class LevelBuilderRuntime {
   private readonly transformControls: TransformControls;
   private readonly transformHelper: THREE.Object3D;
   private readonly selectionHelper: THREE.BoxHelper;
+  private readonly editorLight: THREE.AmbientLight;
   private readonly session: LevelBuilderSession;
   private readonly panel: LevelBuilderPanel;
   private readonly originalStates = new Map<
@@ -59,6 +62,7 @@ export class LevelBuilderRuntime {
   private pointerDownPosition: THREE.Vector2 | null = null;
   private skipNextCanvasSelection = false;
   private layoutDirty = false;
+  private editorBrightness = LEVEL_BUILDER_DEFAULT_EDITOR_BRIGHTNESS;
 
   public constructor(private readonly options: LevelBuilderRuntimeOptions) {
     this.session = new LevelBuilderSession(
@@ -100,6 +104,10 @@ export class LevelBuilderRuntime {
     this.selectionHelper.layers.set(RENDER_LAYERS.debug);
     options.scene.add(this.selectionHelper);
 
+    this.editorLight = new THREE.AmbientLight(0xffffff, 0);
+    this.editorLight.name = 'LEVEL_BUILDER_EditorLight';
+    options.scene.add(this.editorLight);
+
     this.panel = new LevelBuilderPanel(options.panelRoot, {
       roomRoot: options.roomRoot,
       roomId: options.roomId,
@@ -109,6 +117,8 @@ export class LevelBuilderRuntime {
       onSelectObject: (object) => this.selectObject(object),
       onTransformModeChange: (mode) => this.setTransformMode(mode),
       onSnapPresetChange: (preset) => this.setSnapPreset(preset),
+      onEditorBrightnessChange: (brightness) =>
+        this.setEditorBrightness(brightness),
       onDuplicateSelection: () => this.duplicateSelection(),
       onRemoveSelection: () => this.removeSelection(),
       onRoomChange: (roomIndex) => this.changeRoom(roomIndex),
@@ -142,6 +152,7 @@ export class LevelBuilderRuntime {
     this.orbitControls.enabled = true;
     this.transformControls.enabled = true;
     this.transformHelper.visible = true;
+    this.editorLight.intensity = this.editorBrightness;
     this.frameRoom();
     this.panel.show();
     this.panel.setStatus(
@@ -171,6 +182,7 @@ export class LevelBuilderRuntime {
     this.transformHelper.visible = false;
     this.orbitControls.enabled = false;
     this.selectionHelper.visible = false;
+    this.editorLight.intensity = 0;
     this.panel.hide();
     this.options.camera.position.copy(this.savedCameraPosition);
     this.options.camera.quaternion.copy(this.savedCameraQuaternion);
@@ -228,10 +240,26 @@ export class LevelBuilderRuntime {
     );
     this.transformControls.dispose();
     this.orbitControls.dispose();
-    this.options.scene.remove(this.transformHelper, this.selectionHelper);
+    this.options.scene.remove(
+      this.transformHelper,
+      this.selectionHelper,
+      this.editorLight,
+    );
     this.selectionHelper.geometry.dispose();
     this.selectionHelper.material.dispose();
     this.panel.dispose();
+  }
+
+  private setEditorBrightness(brightness: number): void {
+    this.editorBrightness = THREE.MathUtils.clamp(
+      Number.isFinite(brightness) ? brightness : 0,
+      0,
+      LEVEL_BUILDER_MAX_EDITOR_BRIGHTNESS,
+    );
+
+    if (this.openState) {
+      this.editorLight.intensity = this.editorBrightness;
+    }
   }
 
   private selectObject(sourceObject: THREE.Object3D): void {

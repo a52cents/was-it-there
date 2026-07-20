@@ -344,6 +344,8 @@ export class StoryDirector {
       this.progress.addDiscovery(effect.discoveryId);
     } else if (effect.type === 'add-fragment') {
       this.progress.addFragment(effect.fragmentId);
+    } else if (effect.type === 'add-ending') {
+      this.progress.addEnding(effect.endingId);
     } else if (effect.type === 'set-flag') {
       this.progress.setFlag(effect.flagId, effect.value);
     }

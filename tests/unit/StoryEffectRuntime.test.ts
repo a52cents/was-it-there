@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { STORY_AUDIO_CUE_IDS } from '../../src/audio/AudioManager';
 import { StoryEffectRuntime } from '../../src/gameplay/story/StoryEffectRuntime';
 import type { StoryEffectExecution } from '../../src/gameplay/story/StoryDirector';
 import type { StoryEffectDefinition } from '../../src/gameplay/story/StoryEvent';
@@ -66,7 +67,9 @@ describe('StoryEffectRuntime', () => {
     );
 
     expect(subtitle.show).toHaveBeenCalledWith(
-      expect.objectContaining({ text: 'There were four of us.' }),
+      expect.objectContaining({
+        text: 'There were four of us. Someone cut Elise out of the photograph.',
+      }),
     );
     expect(audio.play).toHaveBeenCalledWith('story-photo-memory');
     expect(memory.show).toHaveBeenCalledWith('bedroom-empty-place');
@@ -116,7 +119,7 @@ describe('StoryEffectRuntime', () => {
     expect(subtitle.update).toHaveBeenCalledWith(16);
     expect(subtitle.pause).toHaveBeenCalledOnce();
     expect(memory.resume).toHaveBeenCalledOnce();
-    expect(audio.stop).toHaveBeenCalledTimes(17);
+    expect(audio.stop).toHaveBeenCalledTimes(STORY_AUDIO_CUE_IDS.length);
     expect(subtitle.reset).toHaveBeenCalledOnce();
     expect(memory.reset).toHaveBeenCalledOnce();
   });

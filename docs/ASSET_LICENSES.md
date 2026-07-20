@@ -156,14 +156,49 @@ ne charge donc qu’un matériau et une texture pour toute la pièce.
 - Modifications runtime : matériaux rendus plus mats et légèrement désaturés,
   ombres activées, placement et échelle normalisés par le runtime de salle.
 
-## Source évaluée — Quaternius Ultimate House Interior Pack
+## Quaternius — Ultimate House Interior Pack
 
-Le pack FBX fourni dans `pre-assets/2nd pack` est conservé pour de futures
-salles, mais aucun de ses modèles n’est actuellement référencé par le build.
-La source et sa licence CC0 sont archivées dans
-[`docs/licenses/quaternius-ultimate-house-interior-pack.txt`](./licenses/quaternius-ultimate-house-interior-pack.txt).
-Tiny Treats a été retenu pour cette salle afin de garder une direction visuelle
-unique et d’éviter un second pipeline FBX.
+- Créateur : Quaternius.
+- Source : <https://poly.pizza/bundle/Ultimate-House-Interior-Pack-2SXnFbwFzm>.
+- Licence : Creative Commons Zero 1.0 Universal (CC0).
+- Notice archivée :
+  [`docs/licenses/quaternius-ultimate-house-interior-pack.txt`](./licenses/quaternius-ultimate-house-interior-pack.txt).
+- Source locale : `pre-assets/2nd pack`.
+- Usage : portes et fenêtres de toutes les salles actuelles, six éléments de
+  mobilier propres au salon et la machine à laver de la buanderie.
+
+Dix modèles FBX ont été convertis en GLB autonomes. Le runtime adapte leur
+taille aux ouvertures existantes, harmonise le bois, le métal et le vitrage,
+et conserve séparément les pivots d’ouverture et les collisions du jeu. Les
+dix fichiers totalisent `422 964` octets.
+
+| Fichier local | Fichier source | Usage | Triangles | SHA-256 |
+|---|---|---|---:|---|
+| `src/assets/models/house-shell/interior-door.glb` | `Door/Door_3.fbx` | portes intérieures | 856 | `933FC930227BDCCB1B5D3CCAA097C69B61F6F5C0269F7128D7E5B1C86B6FB91A` |
+| `src/assets/models/house-shell/window-large.glb` | `Window Large/Window_Large2.fbx` | fenêtres larges | 372 | `48B1BA4F5E66F1723008B6778DD5A0333AF15A4796C29A379E1F6D9BCB13647B` |
+| `src/assets/models/house-shell/window-small.glb` | `Window Small/Window_Small2.fbx` | baies étroites et inclinées | 132 | `899F88B796C4FAA7CD153E9EDDE9B46CBB1BAB44AAAB7064137348A78082533C` |
+| `src/assets/models/living-room/prop-l-couch.glb` | `L Couch/Couch_L.fbx` | canapé d'angle du salon | 1 417 | `8896066BF0F1F33422B6547278F5260DA7F4CDF1FC47FB26DFD2C17868D36B1D` |
+| `src/assets/models/living-room/prop-fireplace.glb` | `Fireplace/Fireplace.fbx` | cheminée | 352 | `86180675F6E0B63D42720CED9C290F25D3D12E13D64B208D600F59A2C3FC52F1` |
+| `src/assets/models/living-room/prop-shelf-large.glb` | `Shelf Large/Shelf_Large.fbx` | étagère d'archives | 220 | `7C9AD1C2C80085ADFFF14A8F05E422EA07D0DFFAB96C3A725E1DBF8F947E38C0` |
+| `src/assets/models/living-room/prop-curtains-double.glb` | `Curtains Double/Curtains_Double.fbx` | rideaux de la baie | 320 | `A251F7DA62605EF16F1D6345EA1DEFC01440B81AC7EE841729A9285AB35B7EE8` |
+| `src/assets/models/living-room/prop-rug-round.glb` | `Round Rug/Carpet_Round.fbx` | tapis central | 128 | `68F7A6A39A7F046CA6F569FD1FAB7BE9200D3A6A6FFA27222EB85E4174EE3842` |
+| `src/assets/models/living-room/prop-chandelier.glb` | `Light Chandelier/Light_Chandelier.fbx` | lustre principal | 972 | `E409FAAD977408DBC67B2EA0DB4A2380D46F692BF158CBB1C8D0B495F1DDAE5D` |
+| `src/assets/models/laundry-room/prop-washing-machine.glb` | `Washing Machine/Bathroom_WashingMachine.fbx` | machine à laver de la buanderie | — | `359AFF8D818518D97CD4B42AC040D46D7A73C6D3ECE866E337B58CA2F7332EA9` |
+
+## Réutilisation — buanderie
+
+La buanderie ajoute uniquement la machine à laver ci-dessus. Le bac, le meuble,
+l'étagère, le banc et le tapis réutilisent les catalogues déjà chargés par les
+salles précédentes. L'étendoir, les vêtements numérotés, le panier et la table à
+repasser sont des formes procédurales légères afin de rendre immédiatement
+jouable l'enquête du chapitre 2.
+
+## Réutilisation — salon
+
+Le salon complète les six modèles Quaternius ci-dessus avec huit objets déjà
+présents dans le build : télévision, meuble TV, radio utilisée comme lecteur de
+cassette, cadre photo, plante, lampe sur pied, table vitrée et fauteuil. Cette
+réutilisation évite un nouveau téléchargement et conserve une palette cohérente.
 
 ## Réutilisation — bureau
 

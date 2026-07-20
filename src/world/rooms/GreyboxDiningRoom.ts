@@ -301,6 +301,17 @@ export class GreyboxDiningRoom extends RoomRuntime implements PlayableRoom {
   }
 
   public async loadAssets(assetManager?: AssetManager): Promise<void> {
+    await this.loadDiningRoomAssets(assetManager);
+    const manager = this.assetManager;
+
+    if (manager === null) {
+      throw new Error('The dining-room AssetManager is unavailable.');
+    }
+
+    await this.loadHouseShellAssets(manager, 'dining-room');
+  }
+
+  private async loadDiningRoomAssets(assetManager?: AssetManager): Promise<void> {
     if (!this.isMounted()) {
       throw new Error('The dining room must be mounted before loading assets.');
     }
@@ -792,7 +803,6 @@ export class GreyboxDiningRoom extends RoomRuntime implements PlayableRoom {
     const platePositions: readonly Vector3Tuple[] = [
       [-0.65, 0.81, -0.33], [0.65, 0.81, -0.33],
       [-0.65, 0.81, 0.33], [0.65, 0.81, 0.33],
-      [-0.9, 0.81, 0], [0.9, 0.81, 0],
     ];
     for (const [index, position] of platePositions.entries()) {
       details.add(this.createCylinder(`DETAIL_DiningRoom_Plate_${index + 1}`, 0.13, 0.025, position, materials.porcelain));

@@ -15,13 +15,19 @@ Le bouton `CLOSE` restaure tous les objets modifiés pendant la session. Si une
 partie était en cours, le jeu redemande ensuite le pointer lock et reprend la
 manche.
 
-La section `LEVEL` permet de charger directement les six salles construites
-(chambre, salle de bain, couloir, bureau, cuisine et salle à manger). Le nouveau Level Builder se rouvre
+La section `LEVEL` permet de charger directement les huit salles construites
+(chambre, salle de bain, couloir, bureau, cuisine, salle à manger, salon et
+buanderie). Le nouveau Level Builder se rouvre
 automatiquement dans la salle choisie : il n'est pas nécessaire de terminer les
 salles précédentes.
 
 Changer de salle restaure la salle courante. Si le layout a été modifié, une
 confirmation rappelle de l'exporter avant le changement.
+
+La section `EDITOR LIGHT` ajoute temporairement jusqu'à 200 % de lumière
+ambiante afin de mieux voir les objets pendant le placement. Ce réglage ne
+modifie ni l'éclairage réel de la salle ni les fichiers JSON exportés, et la
+lumière supplémentaire est désactivée dès que le Level Builder est fermé.
 
 ## Navigation et sélection
 

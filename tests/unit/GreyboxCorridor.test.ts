@@ -126,7 +126,7 @@ describe('GreyboxCorridor', () => {
     await room.loadAssets(manager);
     await room.loadAssets(manager);
 
-    expect(load).toHaveBeenCalledTimes(16);
+    expect(load).toHaveBeenCalledTimes(17);
     expect(new Set(room.getLoadedAssetIds())).toEqual(
       new Set(Object.values(CORRIDOR_ASSET_CATALOG).map((asset) => asset.id)),
     );

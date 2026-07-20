@@ -121,6 +121,10 @@ export class PlayerController {
     return this.look.getPitch();
   }
 
+  public setLookSensitivityMultiplier(multiplier: number): void {
+    this.look.setSensitivityMultiplier(multiplier);
+  }
+
   public getCurrentVelocity(): Readonly<THREE.Vector3> {
     return this.movement.getCurrentVelocity();
   }

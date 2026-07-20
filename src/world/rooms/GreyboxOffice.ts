@@ -487,6 +487,17 @@ export class GreyboxOffice extends RoomRuntime implements PlayableRoom {
   }
 
   public async loadAssets(assetManager?: AssetManager): Promise<void> {
+    await this.loadOfficeAssets(assetManager);
+    const manager = this.assetManager;
+
+    if (manager === null) {
+      throw new Error('The office AssetManager is unavailable.');
+    }
+
+    await this.loadHouseShellAssets(manager, 'office');
+  }
+
+  private async loadOfficeAssets(assetManager?: AssetManager): Promise<void> {
     if (!this.isMounted()) {
       throw new Error('The office must be mounted before loading assets.');
     }

@@ -5,6 +5,10 @@ import { HousePressureView } from '../../src/ui/HousePressureView';
 class FakeClassList {
   private readonly values = new Set<string>();
 
+  public add(value: string): void {
+    this.values.add(value);
+  }
+
   public toggle(value: string, force?: boolean): boolean {
     const enabled = force ?? !this.values.has(value);
 
@@ -99,7 +103,7 @@ describe('HousePressureView', () => {
     const time = getElement(document, 'house-pressure-overlay__time');
 
     expect(vignette.style.opacity).toBe('0');
-    expect(time.textContent).toBe('03:04');
+    expect(time.textContent).toBe('RECONSTRUCTION SIGNAL LOST');
     expect(time.style.opacity).toBe('0');
 
     view.apply(FAILURE_SNAPSHOT);
@@ -107,6 +111,16 @@ describe('HousePressureView', () => {
     expect(overlay.classList.contains('is-failing')).toBe(true);
     expect(vignette.style.opacity).toBe('0.8000');
     expect(Number(time.style.opacity)).toBeGreaterThan(0);
+
+    view.applyFailureFade(0.5);
+    expect(overlay.style.backgroundColor).toBe('rgb(0 0 0 / 0.9400)');
+
+    view.holdFailureBlack();
+    expect(overlay.classList.contains('is-game-over-background')).toBe(true);
+    expect(overlay.style.backgroundColor).toBe('#000');
+
+    view.reset();
+    expect(overlay.classList.contains('is-game-over-background')).toBe(false);
   });
 
   it('announces pressure accessibly and cleans up its elements', () => {
@@ -119,6 +133,15 @@ describe('HousePressureView', () => {
     view.announcePressure(2);
     expect(announcement.textContent).toBe('THE HOUSE IS WATCHING.');
     expect(announcement.dataset.pressure).toBe('2');
+
+    view.applyErasureWarning(0.6);
+    expect(announcement.textContent).toBe(
+      'THE HOUSE IS ERASING THE ROOM.',
+    );
+    expect(announcement.dataset.erasure).toBe('true');
+
+    view.resetErasureWarning();
+    expect(announcement.textContent).toBe('');
 
     view.dispose();
     expect(overlay.removed).toBe(true);

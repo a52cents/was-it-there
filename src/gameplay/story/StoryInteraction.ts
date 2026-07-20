@@ -2,6 +2,12 @@ import type { StoryPhase } from './StoryEvent';
 
 export type StoryInteractionPhase = Extract<StoryPhase, 'room-complete'>;
 
+export interface StoryExitInstructionStage {
+  readonly untilEventId?: string;
+  readonly untilAnyEventIds?: readonly string[];
+  readonly instruction: string;
+}
+
 export interface StoryInteractionDefinition {
   readonly id: string;
   readonly roomId: string;
@@ -9,7 +15,9 @@ export interface StoryInteractionDefinition {
   readonly actionLabel: string;
   readonly phases: readonly StoryInteractionPhase[];
   readonly requiredEventIdBeforeExit?: string;
+  readonly requiredAnyEventIdsBeforeExit?: readonly string[];
   readonly exitInstruction?: string;
+  readonly exitInstructionStages?: readonly StoryExitInstructionStage[];
 }
 
 export class StoryInteractionRegistry {
@@ -60,8 +68,11 @@ export class StoryInteractionRegistry {
         );
       }
 
-      const hasRequiredEvent =
+      const hasSingleRequiredEvent =
         definition.requiredEventIdBeforeExit !== undefined;
+      const hasAnyRequiredEvents =
+        definition.requiredAnyEventIdsBeforeExit !== undefined;
+      const hasRequiredEvent = hasSingleRequiredEvent || hasAnyRequiredEvents;
       const hasExitInstruction = definition.exitInstruction !== undefined;
 
       if (hasRequiredEvent !== hasExitInstruction) {
@@ -71,10 +82,22 @@ export class StoryInteractionRegistry {
       }
 
       if (hasRequiredEvent && hasExitInstruction) {
-        assertText(
-          definition.requiredEventIdBeforeExit,
-          `Story interaction "${definition.id}" exit event id`,
-        );
+        if (hasSingleRequiredEvent === hasAnyRequiredEvents) {
+          throw new Error(
+            `Story interaction "${definition.id}" must define one exit requirement form.`,
+          );
+        }
+        if (definition.requiredEventIdBeforeExit !== undefined) {
+          assertText(definition.requiredEventIdBeforeExit, `Story interaction "${definition.id}" exit event id`);
+        }
+        if (definition.requiredAnyEventIdsBeforeExit !== undefined) {
+          if (definition.requiredAnyEventIdsBeforeExit.length === 0) {
+            throw new Error(`Story interaction "${definition.id}" requires at least one alternative exit event.`);
+          }
+          definition.requiredAnyEventIdsBeforeExit.forEach((eventId) =>
+            assertText(eventId, `Story interaction "${definition.id}" alternative exit event id`),
+          );
+        }
         assertText(
           definition.exitInstruction,
           `Story interaction "${definition.id}" exit instruction`,
@@ -86,7 +109,34 @@ export class StoryInteractionRegistry {
           );
         }
 
+        for (const [index, stage] of (
+          definition.exitInstructionStages ?? []
+        ).entries()) {
+          const hasStageEvent = stage.untilEventId !== undefined;
+          const hasStageAlternatives = stage.untilAnyEventIds !== undefined;
+          if (hasStageEvent === hasStageAlternatives) {
+            throw new Error(`Story interaction "${definition.id}" exit stage ${index + 1} must define one event requirement.`);
+          }
+          if (stage.untilEventId !== undefined) {
+            assertText(stage.untilEventId, `Story interaction "${definition.id}" exit stage ${index + 1} event id`);
+          }
+          if (stage.untilAnyEventIds !== undefined) {
+            if (stage.untilAnyEventIds.length === 0) {
+              throw new Error(`Story interaction "${definition.id}" exit stage ${index + 1} has no alternative event.`);
+            }
+            stage.untilAnyEventIds.forEach((eventId) => assertText(eventId, `Story interaction "${definition.id}" exit stage ${index + 1} alternative event id`));
+          }
+          assertText(
+            stage.instruction,
+            `Story interaction "${definition.id}" exit stage ${index + 1} instruction`,
+          );
+        }
+
         this.exitRequirements.set(definition.roomId, definition);
+      } else if ((definition.exitInstructionStages?.length ?? 0) > 0) {
+        throw new Error(
+          `Story interaction "${definition.id}" cannot define exit stages without an exit requirement.`,
+        );
       }
 
       interactionIds.add(definition.id);

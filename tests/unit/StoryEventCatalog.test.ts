@@ -22,6 +22,13 @@ describe('StoryEventCatalog', () => {
     expect(
       director.emit({
         type: 'object-examined',
+        objectId: 'bedroom-radio',
+      }),
+    ).toBe(1);
+
+    expect(
+      director.emit({
+        type: 'object-examined',
         objectId: 'bedroom-family-photo',
       }),
     ).toBe(1);
@@ -129,6 +136,13 @@ describe('StoryEventCatalog', () => {
     expect(onEffect).toHaveBeenCalledWith(
       expect.objectContaining({ eventId: 'bathroom-pipe-warning' }),
     );
+
+    expect(
+      director.emit({
+        type: 'object-examined',
+        objectId: 'bathroom-toothbrushes',
+      }),
+    ).toBe(1);
 
     expect(
       director.emit({
@@ -344,5 +358,196 @@ describe('StoryEventCatalog', () => {
         },
       }),
     );
+  });
+
+  it('reconstructs the dining-room truth in a readable three-step sequence', () => {
+    const progress = new StoryProgress();
+    const onEffect = vi.fn();
+    const director = new StoryDirector(STORY_EVENT_CATALOG, progress, {
+      onEffect,
+    });
+    director.beginLoop('story', 'greybox-bedroom');
+    progress.setFlag('corridor-phone-answered', true);
+    director.enterRoom('dining-room');
+    director.startPhase('observation');
+
+    expect(director.update(1_799)).toBe(0);
+    expect(director.update(1)).toBe(1);
+    expect(director.update(4_600)).toBe(1);
+    expect(progress.hasDiscovery('dining-previous-loop-voice')).toBe(true);
+
+    director.startPhase('room-complete');
+    expect(
+      director.emit({
+        type: 'object-examined',
+        objectId: 'dining-sideboard-record',
+      }),
+    ).toBe(1);
+    expect(progress.getFlag('dining-deletion-order-read')).toBe(false);
+    expect(
+      director.emit({
+        type: 'object-examined',
+        objectId: 'dining-fourth-place',
+      }),
+    ).toBe(1);
+    expect(progress.hasFragment('memory-dining-reconstruction')).toBe(false);
+
+    expect(
+      director.emit({
+        type: 'object-examined',
+        objectId: 'dining-bear-tag',
+      }),
+    ).toBe(1);
+    expect(progress.getFlag('dining-bear-read')).toBe(true);
+    expect(
+      director.emit({
+        type: 'object-examined',
+        objectId: 'dining-sideboard-record',
+      }),
+    ).toBe(1);
+    expect(progress.getFlag('dining-deletion-order-read')).toBe(true);
+    expect(
+      director.emit({
+        type: 'object-examined',
+        objectId: 'dining-fourth-place',
+      }),
+    ).toBe(1);
+    expect(progress.hasFragment('memory-dining-reconstruction')).toBe(true);
+    expect(progress.hasDiscovery('dining-deletion-order')).toBe(true);
+    expect(onEffect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventId: 'dining-reconstruction-truth',
+        effect: {
+          type: 'screen-effect',
+          effectId: 'dining-reconstruction',
+        },
+      }),
+    );
+
+    expect(director.emit({ type: 'room-completed' })).toBe(0);
+    director.setPressureLevel(3);
+    expect(director.emit({ type: 'run-error', kind: 'timeout' })).toBe(1);
+    expect(onEffect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventId: 'dining-reconstruction-failure',
+        effect: {
+          type: 'audio',
+          cueId: 'story-dining-failure',
+          action: 'play',
+        },
+      }),
+    );
+  });
+
+  it("reveals why Noah preserved Elise through the living-room recording", () => {
+    const progress = new StoryProgress();
+    const onEffect = vi.fn();
+    const director = new StoryDirector(STORY_EVENT_CATALOG, progress, {
+      onEffect,
+    });
+    director.beginLoop('story', 'living-room');
+    director.startPhase('observation');
+
+    expect(director.update(2_000)).toBe(1);
+    director.startPhase('room-complete');
+    expect(
+      director.emit({
+        type: 'object-examined',
+        objectId: 'living-tape-player',
+      }),
+    ).toBe(1);
+    expect(progress.getFlag('living-recording-played')).toBe(false);
+    expect(
+      director.emit({
+        type: 'object-examined',
+        objectId: 'living-recording-tape',
+      }),
+    ).toBe(1);
+    expect(progress.hasDiscovery('living-noah-tape')).toBe(true);
+    expect(
+      director.emit({
+        type: 'object-examined',
+        objectId: 'living-tape-player',
+      }),
+    ).toBe(1);
+    expect(progress.getFlag('living-recording-played')).toBe(true);
+    expect(
+      director.emit({
+        type: 'object-examined',
+        objectId: 'living-television',
+      }),
+    ).toBe(1);
+    expect(progress.hasDiscovery('living-noah-message')).toBe(true);
+    expect(progress.hasFragment('memory-noah-protection')).toBe(true);
+    expect(onEffect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventId: 'living-noah-recording-revealed',
+        effect: {
+          type: 'audio',
+          cueId: 'story-living-memory-burst',
+          action: 'play',
+        },
+      }),
+    );
+  });
+
+  it('reveals the discarded Subject 04 iterations in the laundry room', () => {
+    const progress = new StoryProgress();
+    const onEffect = vi.fn();
+    const director = new StoryDirector(STORY_EVENT_CATALOG, progress, {
+      onEffect,
+    });
+    director.beginLoop('story', 'laundry-room');
+    director.startPhase('observation');
+
+    expect(director.update(2_000)).toBe(1);
+    director.startPhase('room-complete');
+    expect(director.emit({
+      type: 'object-examined',
+      objectId: 'laundry-drying-rack',
+    })).toBe(1);
+    expect(onEffect).toHaveBeenCalledWith(expect.objectContaining({
+      eventId: 'laundry-rack-unreadable',
+    }));
+
+    expect(director.emit({
+      type: 'object-examined',
+      objectId: 'laundry-washer-tag',
+    })).toBe(1);
+    expect(director.emit({
+      type: 'object-examined',
+      objectId: 'laundry-drying-rack',
+    })).toBe(1);
+    expect(director.emit({
+      type: 'object-examined',
+      objectId: 'laundry-disposal-bin',
+    })).toBe(1);
+
+    expect(progress.hasDiscovery('laundry-iteration-17')).toBe(true);
+    expect(progress.hasDiscovery('laundry-copy-labels')).toBe(true);
+    expect(progress.hasDiscovery('laundry-discarded-copies')).toBe(true);
+    expect(progress.hasFragment('memory-discarded-copies')).toBe(true);
+  });
+
+  it('reveals the false exit and commits exactly one final archive ending', () => {
+    const progress = new StoryProgress();
+    const director = new StoryDirector(STORY_EVENT_CATALOG, progress);
+    director.beginLoop('story', 'entrance-corridor');
+    director.startPhase('room-complete');
+
+    director.emit({ type: 'object-examined', objectId: 'entrance-intercom' });
+    director.emit({ type: 'object-examined', objectId: 'entrance-return-clock' });
+    director.emit({ type: 'object-examined', objectId: 'entrance-false-front-door' });
+    expect(progress.hasFragment('memory-false-exit')).toBe(true);
+
+    director.enterRoom('main-hall');
+    director.startPhase('room-complete');
+    director.emit({ type: 'object-examined', objectId: 'main-hall-archive-core' });
+    director.emit({ type: 'object-examined', objectId: 'main-hall-choice-remember' });
+    director.emit({ type: 'object-examined', objectId: 'main-hall-choice-replaced' });
+
+    expect(progress.getSnapshot().endingIds).toEqual(['remember']);
+    expect(progress.wasEventTriggeredThisLoop('main-hall-remember-chosen')).toBe(true);
+    expect(progress.wasEventTriggeredThisLoop('main-hall-replaced-chosen')).toBe(false);
   });
 });

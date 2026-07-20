@@ -93,4 +93,16 @@ describe('Story presentation views', () => {
     view.dispose();
     expect(element.removed).toBe(true);
   });
+
+  it('exposes the dining-room reconstruction record', () => {
+    const document = new FakeDocument();
+    const root = document.createElement('div');
+    const view = new StoryMemoryView(root as unknown as HTMLElement);
+    const element = getElement(document, 'story-memory');
+
+    expect(getElement(document, 'story-memory__reconstruction')).toBeDefined();
+    view.show('dining-reconstruction');
+    expect(element.hidden).toBe(false);
+    expect(element.dataset.effect).toBe('dining-reconstruction');
+  });
 });

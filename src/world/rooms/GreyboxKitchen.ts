@@ -450,6 +450,17 @@ export class GreyboxKitchen extends RoomRuntime implements PlayableRoom {
   }
 
   public async loadAssets(assetManager?: AssetManager): Promise<void> {
+    await this.loadKitchenAssets(assetManager);
+    const manager = this.assetManager;
+
+    if (manager === null) {
+      throw new Error('The kitchen AssetManager is unavailable.');
+    }
+
+    await this.loadHouseShellAssets(manager, 'kitchen');
+  }
+
+  private async loadKitchenAssets(assetManager?: AssetManager): Promise<void> {
     if (!this.isMounted()) {
       throw new Error('The kitchen must be mounted before loading assets.');
     }

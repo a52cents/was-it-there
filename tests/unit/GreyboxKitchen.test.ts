@@ -101,7 +101,7 @@ describe('GreyboxKitchen', () => {
     await room.loadAssets(manager);
     await room.loadAssets(manager);
 
-    expect(load).toHaveBeenCalledTimes(19);
+    expect(load).toHaveBeenCalledTimes(21);
     expect(new Set(room.getLoadedAssetIds())).toEqual(
       new Set(Object.values(KITCHEN_ASSET_CATALOG).map(({ id }) => id)),
     );

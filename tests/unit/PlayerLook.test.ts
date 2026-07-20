@@ -66,6 +66,18 @@ describe('PlayerLook', () => {
     expect(look.getPitch()).toBeCloseTo(0.04);
   });
 
+  it('updates the sensitivity multiplier without resetting the view', () => {
+    const { input, look } = createHarness();
+    look.reset(0.3, -0.2);
+    look.setSensitivityMultiplier(1.5);
+    input.addPointerDelta(10, -10);
+
+    look.update();
+
+    expect(look.getYaw()).toBeCloseTo(0.27);
+    expect(look.getPitch()).toBeCloseTo(-0.17);
+  });
+
   it('clamps pitch at its minimum', () => {
     const { input, look } = createHarness();
     input.addPointerDelta(0, 1_000_000);

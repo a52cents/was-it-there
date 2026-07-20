@@ -119,7 +119,7 @@ describe('GreyboxDiningRoom', () => {
     await room.loadAssets(manager);
     await room.loadAssets(manager);
 
-    expect(load).toHaveBeenCalledTimes(10);
+    expect(load).toHaveBeenCalledTimes(13);
     expect(new Set(room.getLoadedAssetIds())).toEqual(
       new Set(Object.values(DINING_ROOM_ASSET_CATALOG).map(({ id }) => id)),
     );

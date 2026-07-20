@@ -130,7 +130,7 @@ describe('GreyboxBathroom', () => {
     await room.loadAssets(manager);
     await room.loadAssets(manager);
 
-    expect(load).toHaveBeenCalledOnce();
+    expect(load).toHaveBeenCalledTimes(3);
     expect(load).toHaveBeenCalledWith(BATHROOM_ASSET_CATALOG.collection.url);
     expect(room.isAssetsLoaded()).toBe(true);
     expect(room.getLoadedAssetIds()).toEqual([

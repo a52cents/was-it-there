@@ -437,6 +437,17 @@ export class GreyboxCorridor extends RoomRuntime implements PlayableRoom {
   }
 
   public async loadAssets(assetManager?: AssetManager): Promise<void> {
+    await this.loadCorridorAssets(assetManager);
+    const manager = this.assetManager;
+
+    if (manager === null) {
+      throw new Error('The first corridor AssetManager is unavailable.');
+    }
+
+    await this.loadHouseShellAssets(manager, 'corridor');
+  }
+
+  private async loadCorridorAssets(assetManager?: AssetManager): Promise<void> {
     if (!this.isMounted()) {
       throw new Error('The first corridor must be mounted before loading assets.');
     }

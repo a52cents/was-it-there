@@ -3,6 +3,12 @@ import type { PlayerSpawn } from '../player/PlayerConfig';
 import { RENDER_LAYERS } from '../rendering/RenderLayers';
 import type { RoomDefinition } from './RoomDefinition';
 import type { WorldCollision } from './WorldCollision';
+import type { AssetManager } from './assets/AssetManager';
+import {
+  installHouseShellModels,
+  releaseHouseShellModels,
+  type HouseShellRoomId,
+} from './rooms/HouseShellModels';
 
 export interface RoomRuntimeOptions {
   readonly scene: THREE.Scene;
@@ -198,6 +204,20 @@ export abstract class RoomRuntime {
     this.mountedWorldCollision.buildFromObject(this.collisionRoot);
   }
 
+  protected async loadHouseShellAssets(
+    assetManager: AssetManager,
+    roomId: HouseShellRoomId,
+  ): Promise<void> {
+    await installHouseShellModels(
+      this,
+      roomId,
+      this.visualRoot,
+      assetManager,
+      () => this.isMounted(),
+    );
+    this.refreshVisualObjectCount();
+  }
+
   protected abstract buildRoom(): void;
 
   protected onRoomReleased(): void {
@@ -217,6 +237,7 @@ export abstract class RoomRuntime {
   }
 
   private releaseRoomContents(): void {
+    releaseHouseShellModels(this);
     this.onRoomReleased();
     this.visualRoot.clear();
     this.collisionRoot.clear();

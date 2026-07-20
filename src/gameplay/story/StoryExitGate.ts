@@ -21,15 +21,31 @@ export class StoryExitGate {
 
     const requirement = this.interactions.getExitRequirement(roomId);
     const requiredEventId = requirement?.requiredEventIdBeforeExit;
+    const requiredAnyEventIds = requirement?.requiredAnyEventIdsBeforeExit;
+    const requirementSatisfied = requiredEventId !== undefined
+      ? this.progress.wasEventTriggeredThisLoop(requiredEventId)
+      : (requiredAnyEventIds ?? []).some((eventId) =>
+          this.progress.wasEventTriggeredThisLoop(eventId),
+        );
 
     if (
       requirement === null ||
-      requiredEventId === undefined ||
-      this.progress.wasEventTriggeredThisLoop(requiredEventId)
+      (requiredEventId === undefined && requiredAnyEventIds === undefined) ||
+      requirementSatisfied
     ) {
       return null;
     }
 
-    return requirement;
+    const pendingStage = requirement.exitInstructionStages?.find((stage) =>
+      stage.untilEventId !== undefined
+        ? !this.progress.wasEventTriggeredThisLoop(stage.untilEventId)
+        : !(stage.untilAnyEventIds ?? []).some((eventId) =>
+            this.progress.wasEventTriggeredThisLoop(eventId),
+          ),
+    );
+
+    return pendingStage === undefined
+      ? requirement
+      : { ...requirement, exitInstruction: pendingStage.instruction };
   }
 }

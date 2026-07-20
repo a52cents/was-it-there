@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  CURRENT_STORY_ROUTE_FINAL_ROOM_ID,
   FIRST_STORY_CHAPTER_FINAL_ROOM_ID,
+  isCurrentStoryRouteFinalRoom,
   isFirstStoryChapterFinalRoom,
   resolveFirstChapterOutcome,
 } from '../../src/gameplay/story/StoryChapterOutcome';
@@ -78,7 +80,7 @@ describe('StoryProgress', () => {
     expect(progress.wasEventTriggeredThisLoop('bedroom-radio')).toBe(false);
   });
 
-  it('resolves the first chapter from the four core memories', () => {
+  it('resolves the first chapter from the complete reconstruction trail', () => {
     expect(
       resolveFirstChapterOutcome([
         'memory-empty-place',
@@ -92,13 +94,21 @@ describe('StoryProgress', () => {
         'memory-mirror-warning',
         'memory-phone-prediction',
         'memory-erased-name',
+        'memory-kitchen-fourth-place',
+        'memory-dining-reconstruction',
       ]),
     ).toBe('chapter-remembered');
   });
 
-  it('continues Story through the office and ends the chapter in the kitchen', () => {
+  it('closes chapter one in the dining room and ends the full route in the main hall', () => {
     expect(isFirstStoryChapterFinalRoom('office')).toBe(false);
-    expect(isFirstStoryChapterFinalRoom('kitchen')).toBe(true);
-    expect(FIRST_STORY_CHAPTER_FINAL_ROOM_ID).toBe('kitchen');
+    expect(isFirstStoryChapterFinalRoom('kitchen')).toBe(false);
+    expect(isFirstStoryChapterFinalRoom('dining-room')).toBe(true);
+    expect(FIRST_STORY_CHAPTER_FINAL_ROOM_ID).toBe('dining-room');
+    expect(isCurrentStoryRouteFinalRoom('dining-room')).toBe(false);
+    expect(isCurrentStoryRouteFinalRoom('living-room')).toBe(false);
+    expect(isCurrentStoryRouteFinalRoom('laundry-room')).toBe(false);
+    expect(isCurrentStoryRouteFinalRoom('main-hall')).toBe(true);
+    expect(CURRENT_STORY_ROUTE_FINAL_ROOM_ID).toBe('main-hall');
   });
 });

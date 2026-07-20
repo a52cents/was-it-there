@@ -1,13 +1,13 @@
 # Was It There?
 
 **Was It There?** is a browser-based 3D observation game built with Vite,
-strict TypeScript, and Three.js. The current playable route contains four
+strict TypeScript, and Three.js. The current playable route contains ten
 connected rooms, FPS controls, capsule/Octree collisions, deterministic anomaly
 baselines, off-scene room preloading, center-screen reporting, blackout
 transitions, procedural audio, a development Level Builder, and the standalone
 platform adapter.
 
-Current milestone: Phase 6 — fourth playable room (large office)
+Current milestone: complete ten-room Story route with three explicit endings
 
 ## Prerequisites
 
@@ -63,13 +63,16 @@ the publishing source. The workflow can also be started manually from the
 
 The official design, technical, art, asset, and development documents are in
 [`docs/`](./docs/). They are the source of truth for future milestones.
+The visual and narrative cleanup checklist is maintained in
+[`docs/room-detail-audit.md`](./docs/room-detail-audit.md).
 
 ## Current state
 
 Phase 3.8 completes the playable greybox loop. After observation and blackout,
 the player reports changes with a central raycast, contextual reticle, counters,
 feedback, and procedural sounds. Wrong reports and timeouts add errors and time
-penalties; the third error opens `GAME OVER`. Finding every change unlocks and
+penalties; late timers progressively erase the room and the third error erases
+the player before the reconstruction screen. Finding every change unlocks and
 animates the exit door, removes its physical blocker, reveals a small illuminated
 landing, and lets the player cross a real threshold. Crossing stops the run and
 opens `YOU GOT OUT` with active time, penalties, final time, errors, and a perfect
@@ -117,12 +120,15 @@ plus ±10° rotations where spatially credible. The final room exposes 100
 prepared variants, with synchronized collision updates for the bed, wardrobe,
 and TV cabinet.
 
-The multi-room route now includes the bedroom, bathroom, L-shaped corridor, and
-a substantially larger polygonal office with a projecting glazed reading bay.
-Rooms preload off-scene and transfer into gameplay without recreating their GLB
-instances. The office contains 18 anomaly targets split between a central work
-island, archive walls, and the reading bay, while reusing existing licensed
-assets without increasing the model catalog.
+The built route now includes all ten canonical rooms: bedroom, bathroom,
+L-shaped corridor, office, kitchen, dining room, living room, laundry room,
+entrance corridor, and main hall. Chapter Two traces Noah's recording, the
+discarded copies, and the false front door before opening the archive. Three
+physical final choices resolve `ESCAPE`, `REMEMBER`, or `REPLACED`; no hidden
+score selects the ending. The last two rooms use replaceable procedural layouts
+so their visual arrangement can be rebuilt later without rewriting gameplay or
+story. Rooms preload off-scene and transfer into gameplay without recreating
+their GLB instances.
 
 The audit decisions and validation evidence are recorded in
 [`docs/GATE_B_REPORT.md`](./docs/GATE_B_REPORT.md) and

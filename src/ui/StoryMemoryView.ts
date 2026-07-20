@@ -6,6 +6,7 @@ export const STORY_SCREEN_EFFECT_IDS = [
   'corridor-ringing-failure',
   'office-erased-name',
   'kitchen-service-ticket',
+  'dining-reconstruction',
 ] as const;
 export type StoryScreenEffectId =
   (typeof STORY_SCREEN_EFFECT_IDS)[number];
@@ -88,12 +89,31 @@ export class StoryMemoryView {
     serviceTime.textContent = STORY_LOOP_ANCHOR.displayTime;
     serviceTicket.append(serviceLabel, places, serviceTime);
 
+    const reconstruction = document.createElement('div');
+    reconstruction.className = 'story-memory__reconstruction';
+    const reconstructionLabel = document.createElement('span');
+    reconstructionLabel.textContent = 'DOMESTIC ARCHIVE // SUBJECT 04';
+    const reconstructionName = document.createElement('strong');
+    reconstructionName.textContent = 'ELISE VALE';
+    const reconstructionStatus = document.createElement('p');
+    reconstructionStatus.textContent = 'DECEASED 03:04 // RECONSTRUCTION ACTIVE';
+    const reconstructionSource = document.createElement('small');
+    reconstructionSource.textContent =
+      'SOURCE: PHOTOGRAPHS / ROUTINES / FAMILY RESIDUE / PRIOR LOOPS';
+    reconstruction.append(
+      reconstructionLabel,
+      reconstructionName,
+      reconstructionStatus,
+      reconstructionSource,
+    );
+
     this.element.append(
       photograph,
       condensation,
       ringing,
       officeRecord,
       serviceTicket,
+      reconstruction,
     );
     root.append(this.element);
   }

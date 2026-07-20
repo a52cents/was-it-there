@@ -39,12 +39,13 @@ import {
 } from '../gameplay/run/RunErrorTracker';
 import { StoryDirector } from '../gameplay/story/StoryDirector';
 import {
-  isFirstStoryChapterFinalRoom,
+  isCurrentStoryRouteFinalRoom,
   resolveFirstChapterOutcome,
   type StoryChapterOutcome,
 } from '../gameplay/story/StoryChapterOutcome';
 import { StoryEffectRuntime } from '../gameplay/story/StoryEffectRuntime';
 import { StoryExitGate } from '../gameplay/story/StoryExitGate';
+import { HouseErasureSystem } from '../gameplay/story/HouseErasureSystem';
 import {
   HousePressureSystem,
   type HousePressureSnapshot,
@@ -68,6 +69,10 @@ import { createAtmosphereProfile } from '../rendering/AtmosphereProfile';
 import { HousePressureLighting } from '../rendering/HousePressureLighting';
 import { RendererManager } from '../rendering/RendererManager';
 import { createAmbientSkyTexture } from '../rendering/SceneAmbience';
+import {
+  SettingsStore,
+  type GameSettings,
+} from '../settings/SettingsStore';
 import { PhaseTimerDisplay } from '../ui/PhaseTimerDisplay';
 import { BlackoutView } from '../ui/BlackoutView';
 import { GameOverScreen } from '../ui/GameOverScreen';
@@ -87,6 +92,10 @@ import { GreyboxBedroom } from '../world/rooms/GreyboxBedroom';
 import { GreyboxCorridor } from '../world/rooms/GreyboxCorridor';
 import { GreyboxDiningRoom } from '../world/rooms/GreyboxDiningRoom';
 import { GreyboxKitchen } from '../world/rooms/GreyboxKitchen';
+import { GreyboxLivingRoom } from '../world/rooms/GreyboxLivingRoom';
+import { GreyboxLaundryRoom } from '../world/rooms/GreyboxLaundryRoom';
+import { GreyboxEntranceCorridor } from '../world/rooms/GreyboxEntranceCorridor';
+import { GreyboxMainHall } from '../world/rooms/GreyboxMainHall';
 import { GreyboxOffice } from '../world/rooms/GreyboxOffice';
 import type { PlayableRoom } from '../world/rooms/PlayableRoom';
 import { RoomPreloader } from '../world/RoomPreloader';
@@ -95,7 +104,11 @@ import bedroomAnomalyCatalog from '../world/rooms/greybox-bedroom-anomalies.json
 import corridorAnomalyCatalog from '../world/rooms/first-corridor-anomalies.json';
 import diningRoomAnomalyCatalog from '../world/rooms/dining-room-anomalies.json';
 import kitchenAnomalyCatalog from '../world/rooms/kitchen-anomalies.json';
+import livingRoomAnomalyCatalog from '../world/rooms/living-room-anomalies.json';
+import laundryRoomAnomalyCatalog from '../world/rooms/laundry-room-anomalies.json';
 import officeAnomalyCatalog from '../world/rooms/office-anomalies.json';
+import entranceCorridorAnomalyCatalog from '../world/rooms/entrance-corridor-anomalies.json';
+import mainHallAnomalyCatalog from '../world/rooms/main-hall-anomalies.json';
 import { WorldCollision } from '../world/WorldCollision';
 import { GameLoop } from './GameLoop';
 import {
@@ -125,7 +138,9 @@ const POINTER_LOCK_COPY = {
   touchResume: 'TAP TO RETURN',
 } as const;
 
-const LEVEL_BUILDER_ROOMS = ESCAPE_ROUTE.slice(0, 6).map((step) => ({
+const GAME_OVER_FADE_DURATION_MS = 650;
+
+const LEVEL_BUILDER_ROOMS = ESCAPE_ROUTE.slice(0, 10).map((step) => ({
   roomIndex: step.roomIndex,
   id: step.id,
   label: `${String(step.roomNumber).padStart(2, '0')} · ${step.displayName}`,
@@ -138,6 +153,8 @@ export class GameApp {
   private readonly gameStateMachine = new GameStateMachine();
   private readonly runTimer = new RunTimer();
   private readonly blackoutTimeline = new BlackoutTimeline();
+  private readonly settingsStore = new SettingsStore();
+  private settings = this.settingsStore.load();
   private readonly audioManager = new AudioManager();
   private readonly roomAudioDirector = new RoomAudioDirector(
     this.audioManager,
@@ -185,6 +202,7 @@ export class GameApp {
   );
   private readonly storyDirector: StoryDirector;
   private readonly storySaveRepository = new StorySaveRepository();
+  private readonly houseErasureSystem = new HouseErasureSystem();
   private readonly housePressureSystem = new HousePressureSystem();
   private readonly housePressureLighting = new HousePressureLighting();
   private room: PlayableRoom;
@@ -209,6 +227,7 @@ export class GameApp {
   private pendingAnomalyPlan: AnomalyPlan | null = null;
   private anomalyAppliedDuringBlackout = false;
   private rewardedReviveUsed = false;
+  private gameOverFadeElapsedMs: number | null = null;
   private failedOutcomeRecordedForRun = false;
   private nextRunSeedOverride: number | null = null;
   private gameOverRevealTarget: THREE.Object3D | null = null;
@@ -220,6 +239,7 @@ export class GameApp {
     private readonly elements: GameAppElements,
     private readonly platformManager: PlatformManager,
   ) {
+    this.applyAudioSettings(this.settings);
     this.room = new GreyboxBedroom();
     if (this.room.definition.id !== this.roomProgression.currentStep.id) {
       throw new Error(
@@ -270,7 +290,11 @@ export class GameApp {
     this.pauseScreen = new PauseScreen(
       elements.modalLayer,
       elements.pointerLockPrompt,
-      this.handleOpenNotebookFromPause,
+      {
+        notebookHandler: this.handleOpenNotebookFromPause,
+        initialSettings: this.settings,
+        onSettingsChange: this.handleSettingsChange,
+      },
     );
     this.storyNotebookScreen = new StoryNotebookScreen(
       elements.modalLayer,
@@ -325,6 +349,9 @@ export class GameApp {
       () => this.isGameplayInputActive(),
       this.worldCollision,
       this.room.getPlayerSpawn(),
+    );
+    this.playerController.setLookSensitivityMultiplier(
+      this.settings.lookSensitivity,
     );
     this.gameLoop = new GameLoop(
       (deltaSeconds) => this.fixedUpdate(deltaSeconds),
@@ -427,6 +454,7 @@ export class GameApp {
     this.unsubscribeStoryProgress = null;
     this.runTimer.stop();
     this.storyDirector.stop();
+    this.houseErasureSystem.release();
     this.housePressureLighting.release();
     this.blackoutTimeline.reset();
     this.roomAudioDirector.reset();
@@ -537,8 +565,23 @@ export class GameApp {
     );
     this.applyHousePressure(housePressure);
 
+    if (state === 'failure-sequence') {
+      this.houseErasureSystem.applyFailure(housePressure.failureProgress);
+    }
+
     if (state === 'failure-sequence' && housePressure.failureComplete) {
-      this.gameStateMachine.transitionTo('game-over');
+      this.gameOverFadeElapsedMs = Math.min(
+        GAME_OVER_FADE_DURATION_MS,
+        (this.gameOverFadeElapsedMs ?? 0) + deltaSeconds * 1_000,
+      );
+      this.housePressureView.applyFailureFade(
+        this.gameOverFadeElapsedMs / GAME_OVER_FADE_DURATION_MS,
+      );
+
+      if (this.gameOverFadeElapsedMs >= GAME_OVER_FADE_DURATION_MS) {
+        this.housePressureView.holdFailureBlack();
+        this.gameStateMachine.transitionTo('game-over');
+      }
       return;
     }
 
@@ -559,8 +602,16 @@ export class GameApp {
     } else if (state === 'search') {
       const phase = this.runTimer.getSnapshot().phase;
 
-      if (phase?.phase === 'search' && phase.expired) {
-        this.registerRunError('timeout');
+      if (phase?.phase === 'search') {
+        const erasureProgress = this.houseErasureSystem.applySearchCountdown(
+          phase.remainingMs,
+          phase.durationMs,
+        );
+        this.housePressureView.applyErasureWarning(erasureProgress);
+
+        if (phase.expired) {
+          this.registerRunError('timeout');
+        }
       }
     } else if (state === 'room-complete') {
       this.exitDoorController.update(deltaSeconds);
@@ -693,6 +744,10 @@ export class GameApp {
       'greybox-bedroom': bedroomAnomalyCatalog,
       'dining-room': diningRoomAnomalyCatalog,
       kitchen: kitchenAnomalyCatalog,
+      'living-room': livingRoomAnomalyCatalog,
+      'laundry-room': laundryRoomAnomalyCatalog,
+      'entrance-corridor': entranceCorridorAnomalyCatalog,
+      'main-hall': mainHallAnomalyCatalog,
       office: officeAnomalyCatalog,
     } as const;
     const catalog = catalogs[this.room.definition.id as keyof typeof catalogs];
@@ -866,17 +921,33 @@ export class GameApp {
       return new GreyboxDiningRoom();
     }
 
+    if (roomIndex === 6) {
+      return new GreyboxLivingRoom();
+    }
+
+    if (roomIndex === 7) {
+      return new GreyboxLaundryRoom();
+    }
+
+    if (roomIndex === 8) {
+      return new GreyboxEntranceCorridor();
+    }
+
+    if (roomIndex === 9) {
+      return new GreyboxMainHall();
+    }
+
     throw new Error(`Room ${roomIndex + 1} has not been built yet.`);
   }
 
   private isRoomBuilt(roomIndex: number): boolean {
-    return roomIndex >= 0 && roomIndex <= 5;
+    return roomIndex >= 0 && roomIndex <= 9;
   }
 
   private canAdvanceToNextRoom(): boolean {
     if (
       this.runIdentity?.mode === 'story' &&
-      isFirstStoryChapterFinalRoom(this.roomProgression.currentStep.id)
+      isCurrentStoryRouteFinalRoom(this.roomProgression.currentStep.id)
     ) {
       return false;
     }
@@ -1209,6 +1280,7 @@ export class GameApp {
     this.audioManager.play('report-incorrect');
 
     if (errorSnapshot.gameOver) {
+      this.gameOverFadeElapsedMs = null;
       this.applyHousePressure(this.housePressureSystem.beginFailure());
       this.audioManager.play('house-takeover');
       this.gameStateMachine.transitionTo('failure-sequence');
@@ -1222,6 +1294,8 @@ export class GameApp {
     );
 
     if (kind === 'timeout') {
+      this.houseErasureSystem.advanceTimeoutStage();
+      this.housePressureView.resetErasureWarning();
       this.runTimer.startPhase(
         'search',
         this.roomProgression.currentStep.searchDurationMs,
@@ -1242,6 +1316,7 @@ export class GameApp {
     this.blackoutTimeline.reset();
     this.blackoutView.reset();
     this.storyEffectRuntime.reset();
+    this.houseErasureSystem.release();
     this.housePressureSystem.reset();
     this.housePressureView.reset();
     this.housePressureLighting.bind(this.room.getVisualRoot(), this.scene);
@@ -1258,6 +1333,7 @@ export class GameApp {
     this.pendingAnomalyPlan = null;
     this.anomalyAppliedDuringBlackout = false;
     this.rewardedReviveUsed = false;
+    this.gameOverFadeElapsedMs = null;
     this.failedOutcomeRecordedForRun = false;
     const identityOptions =
       this.nextRunSeedOverride === null
@@ -1696,6 +1772,23 @@ export class GameApp {
     );
   };
 
+  private readonly handleSettingsChange = (settings: GameSettings): void => {
+    this.settings = settings;
+    this.applyAudioSettings(settings);
+    this.playerController.setLookSensitivityMultiplier(
+      settings.lookSensitivity,
+    );
+    this.settingsStore.save(settings);
+  };
+
+  private applyAudioSettings(settings: GameSettings): void {
+    this.audioManager.setCategoryVolume('master', settings.masterVolume);
+    this.audioManager.setCategoryVolume('music', settings.musicVolume);
+    this.audioManager.setCategoryVolume('ambience', settings.ambienceVolume);
+    this.audioManager.setCategoryVolume('effects', settings.effectsVolume);
+    this.audioManager.setCategoryVolume('interface', settings.effectsVolume);
+  }
+
   private readonly handleEraseStoryProgress = (): void => {
     const emptyProgress = createEmptyStoryProgress();
     this.storySaveRepository.eraseProgressPreservingAccess();
@@ -1801,11 +1894,14 @@ export class GameApp {
 
     switch (transition.to) {
       case 'room-intro':
+        this.gameOverFadeElapsedMs = null;
         this.storyDirector.startPhase('room-intro');
         this.gameOverScreen.hide();
         this.victoryScreen.hide();
         break;
       case 'observation':
+        this.houseErasureSystem.release();
+        this.housePressureView.resetErasureWarning();
         this.storyDirector.startPhase('observation');
         if (!this.runTimer.hasStarted || this.runTimer.isFinished) {
           this.runTimer.startRun();
@@ -1824,6 +1920,8 @@ export class GameApp {
         this.roomAudioDirector.beginBlackout();
         break;
       case 'room-complete':
+        this.houseErasureSystem.release();
+        this.housePressureView.resetErasureWarning();
         this.storyDirector.startPhase('room-complete');
         this.runTimer.clearPhase();
 
@@ -1833,35 +1931,42 @@ export class GameApp {
 
         this.tryUnlockRoomExit();
         break;
-      case 'search':
+      case 'search': {
         this.storyDirector.startPhase('search');
-        {
-          const activePlan = this.anomalySystem.getActivePlan();
+        const activePlan = this.anomalySystem.getActivePlan();
 
-          if (activePlan === null) {
-            throw new Error(
-              'A room anomaly plan is required before reporting can start.',
-            );
-          }
-
-          this.reportSystem.startRound(activePlan);
+        if (activePlan === null) {
+          throw new Error(
+            'A room anomaly plan is required before reporting can start.',
+          );
         }
+
+        this.reportSystem.startRound(activePlan);
         this.blackoutTimeline.reset();
         this.blackoutView.reset();
         this.runTimer.startPhase(
           'search',
           this.roomProgression.currentStep.searchDurationMs,
         );
+        this.houseErasureSystem.beginSearch(
+          this.room.getVisualRoot(),
+          this.room.getAnomalyTargets(),
+          activePlan.anomalies.map(({ targetId }) => targetId),
+        );
         break;
+      }
       case 'failure-sequence':
+        this.housePressureView.resetErasureWarning();
         this.runTimer.clearPhase();
         this.runTimer.stop();
         this.reportHud.reset();
+        this.targetReportHighlight.reset();
         this.setGameplayActive(false);
         break;
       case 'game-over': {
+        this.houseErasureSystem.release();
         this.housePressureSystem.reset();
-        this.housePressureView.reset();
+        this.housePressureView.holdFailureBlack();
         this.housePressureLighting.release();
         this.storyDirector.emit({ type: 'loop-failed' });
 
@@ -1913,6 +2018,7 @@ export class GameApp {
         break;
       }
       case 'victory': {
+        this.houseErasureSystem.release();
         this.housePressureSystem.reset();
         this.housePressureView.reset();
         this.housePressureLighting.release();
@@ -1922,11 +2028,27 @@ export class GameApp {
         let storyOutcome: StoryChapterOutcome | undefined;
 
         if (this.runIdentity?.mode === 'story') {
-          storyOutcome = resolveFirstChapterOutcome(
+          const firstChapterOutcome = resolveFirstChapterOutcome(
             this.storyProgress.getSnapshot().fragments,
           );
+          const endings = this.storyProgress.getSnapshot().endingIds;
+          const finalEnding = endings.includes('replaced')
+            ? 'ending-replaced'
+            : endings.includes('remember')
+              ? 'ending-remember'
+              : endings.includes('escape')
+                ? 'ending-escape'
+                : undefined;
+          storyOutcome = this.room.definition.id === 'main-hall' && finalEnding !== undefined
+            ? finalEnding
+            : this.room.definition.id === 'laundry-room'
+              ? 'chapter-two-copies'
+            : this.room.definition.id === 'living-room'
+              ? 'chapter-two-recording'
+              : firstChapterOutcome;
           this.storyProgress.recordLoopOutcome('completed');
           this.storyProgress.addChapterOutcome('chapter-one-complete');
+          this.storyProgress.addChapterOutcome(firstChapterOutcome);
           this.storyProgress.addChapterOutcome(storyOutcome);
           this.storySaveRepository.unlockEscape();
           this.startScreen.setEscapeUnlocked(true);
@@ -1957,6 +2079,7 @@ export class GameApp {
         break;
       }
       case 'main-menu':
+        this.houseErasureSystem.release();
         this.storyDirector.stop();
         this.storyEffectRuntime.reset();
         this.rendererManager.setAtmosphereProfile(0, 0);

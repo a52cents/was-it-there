@@ -5,5 +5,9 @@ License: Creative Commons Zero 1.0 Universal (CC0)
 Source and license record:
 https://poly.pizza/bundle/Ultimate-House-Interior-Pack-2SXnFbwFzm
 
-The FBX source pack is retained under pre-assets/2nd pack for possible future
-rooms. No model from this pack is currently referenced by the production build.
+The FBX source pack is retained under pre-assets/2nd pack. Door_3,
+Window_Large2 and Window_Small2 are converted to standalone GLB files and used
+by the production build for the doors and windows of every current room.
+Couch_L, Fireplace, Shelf_Large, Curtains_Double, Carpet_Round and
+Light_Chandelier are also converted to standalone GLB files for the Living
+Room. No additional external source is used for that room.

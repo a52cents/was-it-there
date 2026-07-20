@@ -261,6 +261,10 @@ describe('AudioManager', () => {
     manager.play('story-kitchen-reverse-breakfast');
     manager.play('story-kitchen-chair-scrape');
     manager.play('story-kitchen-failure');
+    manager.play('story-dining-voices');
+    manager.play('story-dining-memory-pulse');
+    manager.play('story-dining-archive');
+    manager.play('story-dining-failure');
     manager.play('door-unlock');
     manager.play('door-open');
 
@@ -292,6 +296,10 @@ describe('AudioManager', () => {
       'story-kitchen-reverse-breakfast',
       'story-kitchen-chair-scrape',
       'story-kitchen-failure',
+      'story-dining-voices',
+      'story-dining-memory-pulse',
+      'story-dining-archive',
+      'story-dining-failure',
       'door-unlock',
       'door-open',
     ]);
