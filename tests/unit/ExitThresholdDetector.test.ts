@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { ExitThresholdDetector } from '../../src/gameplay/progression/ExitThresholdDetector';
 
@@ -42,5 +43,31 @@ describe('ExitThresholdDetector', () => {
     expect(northExit.hasCrossed({ x: 2.75, z: -4.59 })).toBe(false);
     expect(northExit.hasCrossed({ x: 2.75, z: -4.6 })).toBe(true);
     expect(northExit.hasCrossed({ x: 2.19, z: -5 })).toBe(false);
+  });
+
+  it('tests a world-space player against a placed room threshold', () => {
+    const roomWorldMatrix = new THREE.Matrix4().compose(
+      new THREE.Vector3(10, 0, 5),
+      new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(0, 1, 0),
+        Math.PI / 2,
+      ),
+      new THREE.Vector3(1, 1, 1),
+    );
+    const placedDetector = new ExitThresholdDetector(
+      {
+        x: 3.65,
+        minimumZ: -2.25,
+        maximumZ: -1.25,
+      },
+      roomWorldMatrix,
+    );
+    const beforeThreshold = new THREE.Vector3(3.64, 0, -1.75)
+      .applyMatrix4(roomWorldMatrix);
+    const beyondThreshold = new THREE.Vector3(4.2, 0, -1.75)
+      .applyMatrix4(roomWorldMatrix);
+
+    expect(placedDetector.hasCrossed(beforeThreshold)).toBe(false);
+    expect(placedDetector.hasCrossed(beyondThreshold)).toBe(true);
   });
 });

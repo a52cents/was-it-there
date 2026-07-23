@@ -61,6 +61,7 @@ export class RoomPreloader<TRoom extends PreloadableRoom> {
       room.mount({
         scene: new THREE.Scene(),
         worldCollision: new WorldCollision(),
+        activateCollision: false,
       });
     } catch (error: unknown) {
       this.onError(roomIndex, error);

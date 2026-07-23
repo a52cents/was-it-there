@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { ExitThresholdDefinition } from '../gameplay/progression/ExitThresholdDetector';
+import type { PlayerSpawn } from '../player/PlayerConfig';
 import type { PlayableRoom } from './rooms/PlayableRoom';
 
 export interface DoorwayAnchor {
@@ -31,7 +32,7 @@ export function resolveExitDoorway(room: PlayableRoom): DoorwayAnchor {
   const center = getDoorColliderCenter(room, 'exit');
   const thresholdCenter = getThresholdCenter(
     room.getExitThresholdDefinition(),
-  );
+  ).applyMatrix4(room.getCollisionRoot().matrixWorld);
   const direction = thresholdCenter.sub(center).setY(0);
 
   if (direction.lengthSq() === 0) {
@@ -168,6 +169,32 @@ export function resetRoomPlacement(room: PlayableRoom): void {
     position: new THREE.Vector3(),
     rotationY: 0,
   });
+}
+
+export function resolveRoomPlayerSpawn(room: PlayableRoom): PlayerSpawn {
+  const spawn = room.getPlayerSpawn();
+  const root = room.getVisualRoot();
+  root.updateWorldMatrix(true, false);
+  const position = new THREE.Vector3(spawn.x, spawn.y, spawn.z)
+    .applyMatrix4(root.matrixWorld);
+  const worldRotation = new THREE.Euler().setFromQuaternion(
+    root.getWorldQuaternion(new THREE.Quaternion()),
+    'YXZ',
+  );
+
+  return {
+    x: position.x,
+    y: position.y,
+    z: position.z,
+    yaw: (spawn.yaw ?? 0) + worldRotation.y,
+    pitch: spawn.pitch ?? 0,
+  };
+}
+
+export function resolveExitDoorCollisionRoots(
+  room: PlayableRoom,
+): readonly THREE.Object3D[] {
+  return findDoorwayNodes(room.getCollisionRoot(), 'exit');
 }
 
 function getDoorColliderCenter(

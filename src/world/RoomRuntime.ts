@@ -6,7 +6,7 @@ import type { WorldCollision } from './WorldCollision';
 import type { AssetManager } from './assets/AssetManager';
 import {
   installHouseShellModels,
-  releaseHouseShellModels,
+  takeHouseShellReleaseTasks,
   type HouseShellRoomId,
 } from './rooms/HouseShellModels';
 
@@ -14,6 +14,14 @@ export interface RoomRuntimeOptions {
   readonly scene: THREE.Scene;
   readonly worldCollision: WorldCollision;
   readonly activateCollision?: boolean;
+}
+
+export type RoomCleanupYield = () => Promise<void>;
+
+interface RoomOwnedResources {
+  readonly geometries: readonly THREE.BufferGeometry[];
+  readonly materials: readonly THREE.Material[];
+  readonly textures: readonly THREE.Texture[];
 }
 
 export abstract class RoomRuntime {
@@ -26,6 +34,7 @@ export abstract class RoomRuntime {
   private readonly ownedTextures = new Set<THREE.Texture>();
   private mountedScene: THREE.Scene | null = null;
   private mountedWorldCollision: WorldCollision | null = null;
+  private incrementalRelease: Promise<void> | null = null;
   private visualObjectCount = 0;
   private collisionObjectCount = 0;
 
@@ -36,7 +45,7 @@ export abstract class RoomRuntime {
   }
 
   public mount(options: RoomRuntimeOptions): void {
-    if (this.isMounted()) {
+    if (this.isMounted() || this.incrementalRelease !== null) {
       throw new Error(`Room "${this.definition.id}" is already mounted.`);
     }
 
@@ -70,21 +79,48 @@ export abstract class RoomRuntime {
   }
 
   public unmount(): void {
-    if (!this.isMounted()) {
+    if (!this.isMounted() || this.incrementalRelease !== null) {
       return;
     }
 
-    this.mountedScene?.remove(this.visualRoot, this.collisionRoot);
+    this.detachRoom();
+    this.releaseRoomContents();
+  }
 
+  public unmountIncrementally(
+    yieldBetweenBatches: RoomCleanupYield,
+    batchSize = 24,
+  ): Promise<void> {
     if (
-      this.mountedWorldCollision?.getSourceRoot() === this.collisionRoot
+      !Number.isInteger(batchSize) ||
+      batchSize <= 0
     ) {
-      this.mountedWorldCollision.clear();
+      return Promise.reject(
+        new RangeError('Room cleanup batch size must be a positive integer.'),
+      );
     }
 
-    this.mountedScene = null;
-    this.mountedWorldCollision = null;
-    this.releaseRoomContents();
+    if (this.incrementalRelease !== null) {
+      return this.incrementalRelease;
+    }
+
+    if (!this.isMounted()) {
+      return Promise.resolve();
+    }
+
+    this.detachRoom();
+    const resources = this.takeOwnedResources();
+    const release = this.releaseRoomContentsIncrementally(
+      resources,
+      yieldBetweenBatches,
+      batchSize,
+    ).finally(() => {
+      if (this.incrementalRelease === release) {
+        this.incrementalRelease = null;
+      }
+    });
+    this.incrementalRelease = release;
+    return release;
   }
 
   public transferMount(options: RoomRuntimeOptions): void {
@@ -229,6 +265,10 @@ export abstract class RoomRuntime {
     // Concrete rooms can clear references to locally owned scene objects.
   }
 
+  protected takeDeferredRoomReleaseTasks(): readonly (() => void)[] {
+    return [];
+  }
+
   private createSharedAmbience(): void {
     const skyFill = new THREE.HemisphereLight(
       '#c9dbe0',
@@ -242,29 +282,101 @@ export abstract class RoomRuntime {
   }
 
   private releaseRoomContents(): void {
-    releaseHouseShellModels(this);
+    const deferredReleases = [
+      ...takeHouseShellReleaseTasks(this),
+      ...this.takeDeferredRoomReleaseTasks(),
+    ];
+
+    for (const release of deferredReleases) {
+      release();
+    }
+
     this.onRoomReleased();
     this.visualRoot.clear();
     this.collisionRoot.clear();
+    const resources = this.takeOwnedResources();
 
-    for (const geometry of this.ownedGeometries) {
+    for (const geometry of resources.geometries) {
       geometry.dispose();
     }
 
-    for (const material of this.ownedMaterials) {
+    for (const material of resources.materials) {
       material.dispose();
     }
 
-    for (const texture of this.ownedTextures) {
+    for (const texture of resources.textures) {
       texture.dispose();
     }
+  }
 
+  private async releaseRoomContentsIncrementally(
+    resources: RoomOwnedResources,
+    yieldBetweenBatches: RoomCleanupYield,
+    batchSize: number,
+  ): Promise<void> {
+    const deferredReleases = [
+      ...takeHouseShellReleaseTasks(this),
+      ...this.takeDeferredRoomReleaseTasks(),
+    ];
+    await yieldBetweenBatches();
+    await clearObjectChildrenInBatches(
+      [this.visualRoot, this.collisionRoot],
+      yieldBetweenBatches,
+      batchSize,
+    );
+    await disposeInBatches(
+      deferredReleases,
+      (release) => release(),
+      yieldBetweenBatches,
+      Math.min(batchSize, 4),
+    );
+    this.onRoomReleased();
+    await disposeInBatches(
+      resources.geometries,
+      (geometry) => geometry.dispose(),
+      yieldBetweenBatches,
+      batchSize,
+    );
+    await disposeInBatches(
+      resources.materials,
+      (material) => material.dispose(),
+      yieldBetweenBatches,
+      batchSize,
+    );
+    await disposeInBatches(
+      resources.textures,
+      (texture) => texture.dispose(),
+      yieldBetweenBatches,
+      batchSize,
+    );
+  }
+
+  private detachRoom(): void {
+    this.mountedScene?.remove(this.visualRoot, this.collisionRoot);
+
+    if (
+      this.mountedWorldCollision?.getSourceRoot() === this.collisionRoot
+    ) {
+      this.mountedWorldCollision.clear();
+    }
+
+    this.mountedScene = null;
+    this.mountedWorldCollision = null;
+  }
+
+  private takeOwnedResources(): RoomOwnedResources {
+    const resources = {
+      geometries: [...this.ownedGeometries],
+      materials: [...this.ownedMaterials],
+      textures: [...this.ownedTextures],
+    } satisfies RoomOwnedResources;
     this.ownedGeometries.clear();
     this.ownedMaterials.clear();
     this.ownedTextures.clear();
     this.visualObjectCount = 0;
     this.collisionObjectCount = 0;
     this.collisionRoot.visible = false;
+    return resources;
   }
 
   private countMeshes(
@@ -279,5 +391,40 @@ export abstract class RoomRuntime {
       }
     });
     return count;
+  }
+}
+
+async function disposeInBatches<T>(
+  resources: readonly T[],
+  dispose: (resource: T) => void,
+  yieldBetweenBatches: RoomCleanupYield,
+  batchSize: number,
+): Promise<void> {
+  for (let offset = 0; offset < resources.length; offset += batchSize) {
+    const batch = resources.slice(offset, offset + batchSize);
+
+    for (const resource of batch) {
+      dispose(resource);
+    }
+
+    if (offset + batchSize < resources.length) {
+      await yieldBetweenBatches();
+    }
+  }
+
+  await yieldBetweenBatches();
+}
+
+async function clearObjectChildrenInBatches(
+  roots: readonly THREE.Object3D[],
+  yieldBetweenBatches: RoomCleanupYield,
+  batchSize: number,
+): Promise<void> {
+  for (const root of roots) {
+    while (root.children.length > 0) {
+      const batch = root.children.slice(0, batchSize);
+      root.remove(...batch);
+      await yieldBetweenBatches();
+    }
   }
 }

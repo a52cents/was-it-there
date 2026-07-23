@@ -1,3 +1,5 @@
+import * as THREE from 'three';
+
 export interface EastWestExitThresholdDefinition {
   readonly x: number;
   readonly minimumZ: number;
@@ -21,7 +23,13 @@ export interface ExitThresholdPosition {
 }
 
 export class ExitThresholdDetector {
-  public constructor(private readonly threshold: ExitThresholdDefinition) {
+  private readonly worldToThresholdSpace: THREE.Matrix4 | null;
+  private readonly localPosition = new THREE.Vector3();
+
+  public constructor(
+    private readonly threshold: ExitThresholdDefinition,
+    thresholdWorldMatrix?: THREE.Matrix4,
+  ) {
     const valid = 'x' in threshold
       ? Number.isFinite(threshold.x) &&
         Number.isFinite(threshold.minimumZ) &&
@@ -35,6 +43,10 @@ export class ExitThresholdDetector {
     if (!valid) {
       throw new RangeError('Exit threshold bounds are invalid.');
     }
+
+    this.worldToThresholdSpace = thresholdWorldMatrix === undefined
+      ? null
+      : thresholdWorldMatrix.clone().invert();
   }
 
   public hasCrossed(position: ExitThresholdPosition): boolean {
@@ -42,21 +54,27 @@ export class ExitThresholdDetector {
       return false;
     }
 
+    const testedPosition = this.worldToThresholdSpace === null
+      ? position
+      : this.localPosition
+          .set(position.x, 0, position.z)
+          .applyMatrix4(this.worldToThresholdSpace);
+
     if ('x' in this.threshold) {
       return (
-        position.x >= this.threshold.x &&
-        position.z >= this.threshold.minimumZ &&
-        position.z <= this.threshold.maximumZ
+        testedPosition.x >= this.threshold.x &&
+        testedPosition.z >= this.threshold.minimumZ &&
+        testedPosition.z <= this.threshold.maximumZ
       );
     }
 
     const crossed = this.threshold.crossing === 'negative-z'
-      ? position.z <= this.threshold.z
-      : position.z >= this.threshold.z;
+      ? testedPosition.z <= this.threshold.z
+      : testedPosition.z >= this.threshold.z;
     return (
       crossed &&
-      position.x >= this.threshold.minimumX &&
-      position.x <= this.threshold.maximumX
+      testedPosition.x >= this.threshold.minimumX &&
+      testedPosition.x <= this.threshold.maximumX
     );
   }
 }

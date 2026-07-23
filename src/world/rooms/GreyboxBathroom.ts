@@ -544,9 +544,13 @@ export class GreyboxBathroom extends RoomRuntime implements PlayableRoom {
     this.createFixtureCollisions();
   }
 
-  protected override onRoomReleased(): void {
-    this.assetLease?.release();
+  protected override takeDeferredRoomReleaseTasks(): readonly (() => void)[] {
+    const lease = this.assetLease;
     this.assetLease = null;
+    return lease === null ? [] : [() => lease.release()];
+  }
+
+  protected override onRoomReleased(): void {
     this.assetsLoaded = false;
     this.anomalyTargetRegistry.clear();
     this.materials = null;

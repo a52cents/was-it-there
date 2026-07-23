@@ -58,6 +58,72 @@ export class WorldCollision {
     this.ready = true;
   }
 
+  public buildVariantsFromObject(
+    root: THREE.Object3D,
+    variant: WorldCollision,
+    excludedVariantRoots: readonly THREE.Object3D[],
+  ): void {
+    if (variant === this) {
+      throw new Error('Collision variants require distinct worlds.');
+    }
+
+    this.clear();
+    variant.clear();
+    root.updateWorldMatrix(true, true);
+    const excludedRoots = new Set(excludedVariantRoots);
+
+    root.traverse((object) => {
+      const mesh = object as THREE.Mesh;
+
+      if (!mesh.isMesh || !this.octree.layers.test(mesh.layers)) {
+        return;
+      }
+
+      const position = mesh.geometry.getAttribute('position');
+      const index = mesh.geometry.index;
+      const triangleCount = (index?.count ?? position.count) / 3;
+      const excludedFromVariant = hasExcludedAncestor(
+        object,
+        root,
+        excludedRoots,
+      );
+      this.sourceTriangleCount += triangleCount;
+
+      if (!excludedFromVariant) {
+        variant.sourceTriangleCount += triangleCount;
+      }
+
+      for (let offset = 0; offset < triangleCount * 3; offset += 3) {
+        const firstIndex = index?.getX(offset) ?? offset;
+        const secondIndex = index?.getX(offset + 1) ?? offset + 1;
+        const thirdIndex = index?.getX(offset + 2) ?? offset + 2;
+        const triangle = new THREE.Triangle(
+          new THREE.Vector3()
+            .fromBufferAttribute(position, firstIndex)
+            .applyMatrix4(mesh.matrixWorld),
+          new THREE.Vector3()
+            .fromBufferAttribute(position, secondIndex)
+            .applyMatrix4(mesh.matrixWorld),
+          new THREE.Vector3()
+            .fromBufferAttribute(position, thirdIndex)
+            .applyMatrix4(mesh.matrixWorld),
+        );
+        this.octree.addTriangle(triangle);
+
+        if (!excludedFromVariant) {
+          variant.octree.addTriangle(triangle);
+        }
+      }
+    });
+
+    this.octree.build();
+    variant.octree.build();
+    this.sourceRoot = root;
+    variant.sourceRoot = root;
+    this.ready = true;
+    variant.ready = true;
+  }
+
   public adoptFrom(
     source: WorldCollision,
     sourceRoot: THREE.Object3D,
@@ -136,4 +202,26 @@ export class WorldCollision {
 
     return triangleCount;
   }
+}
+
+function hasExcludedAncestor(
+  object: THREE.Object3D,
+  root: THREE.Object3D,
+  excludedRoots: ReadonlySet<THREE.Object3D>,
+): boolean {
+  let candidate: THREE.Object3D | null = object;
+
+  while (candidate !== null) {
+    if (excludedRoots.has(candidate)) {
+      return true;
+    }
+
+    if (candidate === root) {
+      return false;
+    }
+
+    candidate = candidate.parent;
+  }
+
+  return false;
 }

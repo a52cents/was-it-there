@@ -31,38 +31,44 @@ const LEGACY_DISCOVERY_ID_MIGRATIONS: Readonly<Record<string, string>> = {
 };
 
 export class StorySaveRepository {
+  private cachedSnapshot: StorySaveSnapshot | null = null;
+
   public constructor(
     private readonly storage: StorySaveStorage | null = getBrowserStorage(),
   ) {}
 
   public load(): StorySaveSnapshot {
+    if (this.cachedSnapshot !== null) {
+      return cloneStorySave(this.cachedSnapshot);
+    }
+
     if (this.storage === null) {
-      return createEmptyStorySave();
+      return this.cacheSnapshot(createEmptyStorySave());
     }
 
     try {
       const serialized = this.storage.getItem(STORY_SAVE_STORAGE_KEY);
 
       if (serialized === null) {
-        return createEmptyStorySave();
+        return this.cacheSnapshot(createEmptyStorySave());
       }
 
       const value: unknown = JSON.parse(serialized);
 
       if (isStorySaveV1(value)) {
-        return cloneStorySave(value);
+        return this.cacheSnapshot(value);
       }
 
       if (isLegacyStoryAccessSaveV1(value)) {
-        return {
+        return this.cacheSnapshot({
           escapeUnlocked: value.escapeUnlocked,
           progress: createEmptyStoryProgress(),
-        };
+        });
       }
 
-      return createEmptyStorySave();
+      return this.cacheSnapshot(createEmptyStorySave());
     } catch {
-      return createEmptyStorySave();
+      return this.cacheSnapshot(createEmptyStorySave());
     }
   }
 
@@ -71,14 +77,18 @@ export class StorySaveRepository {
       return false;
     }
 
-    const save: StorySaveV1 = {
-      version: 1,
+    const snapshotToSave: StorySaveSnapshot = {
       escapeUnlocked: snapshot.escapeUnlocked,
       progress: normalizeProgress(snapshot.progress),
+    };
+    const save: StorySaveV1 = {
+      version: 1,
+      ...snapshotToSave,
     };
 
     try {
       this.storage.setItem(STORY_SAVE_STORAGE_KEY, JSON.stringify(save));
+      this.cachedSnapshot = snapshotToSave;
       return true;
     } catch {
       return false;
@@ -86,24 +96,32 @@ export class StorySaveRepository {
   }
 
   public saveProgress(progress: PersistentStoryProgressSnapshot): boolean {
+    const snapshot = this.cachedSnapshot ?? this.load();
     return this.save({
-      ...this.load(),
+      escapeUnlocked: snapshot.escapeUnlocked,
       progress,
     });
   }
 
   public unlockEscape(): boolean {
+    const snapshot = this.cachedSnapshot ?? this.load();
     return this.save({
-      ...this.load(),
+      ...snapshot,
       escapeUnlocked: true,
     });
   }
 
   public eraseProgressPreservingAccess(): boolean {
+    const snapshot = this.cachedSnapshot ?? this.load();
     return this.save({
-      escapeUnlocked: this.load().escapeUnlocked,
+      escapeUnlocked: snapshot.escapeUnlocked,
       progress: createEmptyStoryProgress(),
     });
+  }
+
+  private cacheSnapshot(snapshot: StorySaveSnapshot): StorySaveSnapshot {
+    this.cachedSnapshot = cloneStorySave(snapshot);
+    return cloneStorySave(this.cachedSnapshot);
   }
 }
 
@@ -128,7 +146,7 @@ function createEmptyStorySave(): StorySaveSnapshot {
   };
 }
 
-function cloneStorySave(save: StorySaveV1): StorySaveSnapshot {
+function cloneStorySave(save: StorySaveSnapshot): StorySaveSnapshot {
   return {
     escapeUnlocked: save.escapeUnlocked,
     progress: normalizeProgress(save.progress),

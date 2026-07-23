@@ -17,12 +17,12 @@ export class StoryMemoryView {
   private readonly element: HTMLElement;
   private remainingMs = 0;
   private paused = false;
+  private warmUpVersion = 0;
 
   public constructor(root: HTMLElement) {
     const document = root.ownerDocument;
     this.element = document.createElement('aside');
     this.element.className = 'story-memory';
-    this.element.hidden = true;
     this.element.setAttribute('aria-hidden', 'true');
 
     const photograph = document.createElement('div');
@@ -119,10 +119,31 @@ export class StoryMemoryView {
   }
 
   public show(effectId: StoryScreenEffectId): void {
-    this.element.hidden = true;
+    this.warmUpVersion += 1;
+    this.element.classList.remove('is-warming', 'is-visible');
     this.element.dataset.effect = effectId;
     this.remainingMs = STORY_MEMORY_DURATION_MS;
-    this.element.hidden = false;
+    this.element.classList.add('is-visible');
+    this.element.setAttribute('aria-hidden', 'false');
+  }
+
+  public async warmUp(): Promise<void> {
+    const view = this.element.ownerDocument.defaultView;
+
+    if (view === null || view === undefined) {
+      return;
+    }
+
+    const warmUpVersion = ++this.warmUpVersion;
+    this.element.classList.add('is-warming');
+    await waitForAnimationFrame(view);
+    await waitForAnimationFrame(view);
+
+    if (warmUpVersion !== this.warmUpVersion) {
+      return;
+    }
+
+    this.element.classList.remove('is-warming');
   }
 
   public update(deltaMs: number): void {
@@ -132,7 +153,7 @@ export class StoryMemoryView {
       );
     }
 
-    if (this.paused || this.element.hidden) {
+    if (this.paused || !this.isVisible()) {
       return;
     }
 
@@ -152,12 +173,14 @@ export class StoryMemoryView {
   }
 
   public isVisible(): boolean {
-    return !this.element.hidden;
+    return this.element.classList.contains('is-visible');
   }
 
   public hide(): void {
+    this.warmUpVersion += 1;
     this.remainingMs = 0;
-    this.element.hidden = true;
+    this.element.classList.remove('is-visible', 'is-warming');
+    this.element.setAttribute('aria-hidden', 'true');
     delete this.element.dataset.effect;
   }
 
@@ -170,4 +193,10 @@ export class StoryMemoryView {
     this.reset();
     this.element.remove();
   }
+}
+
+function waitForAnimationFrame(view: Window): Promise<void> {
+  return new Promise((resolve) => {
+    view.requestAnimationFrame(() => resolve());
+  });
 }

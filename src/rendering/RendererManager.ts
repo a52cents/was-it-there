@@ -228,11 +228,75 @@ export class RendererManager {
 
     try {
       await this.renderer.compileAsync(object, camera, targetScene);
+      await waitForRendererFrame();
       this.warmObjectGeometry(object, camera);
     } finally {
       for (const hiddenObject of hiddenObjects) {
         hiddenObject.visible = false;
       }
+    }
+  }
+
+  public async warmObjectShadowsIncrementally(
+    object: THREE.Object3D,
+    camera: THREE.Camera,
+  ): Promise<void> {
+    const shadowLights: THREE.Light[] = [];
+
+    object.traverse((node) => {
+      const light = node as THREE.Light;
+
+      if (light.isLight && light.castShadow && light.visible) {
+        shadowLights.push(light);
+      }
+    });
+
+    for (const activeLight of shadowLights) {
+      await waitForRendererFrame();
+      const objectVisible = object.visible;
+      const lightVisibility = shadowLights.map((light) => light.visible);
+
+      try {
+        object.visible = true;
+
+        for (const light of shadowLights) {
+          light.visible = light === activeLight;
+        }
+
+        this.warmShadowFrame(object, camera);
+      } finally {
+        object.visible = objectVisible;
+
+        for (const [index, light] of shadowLights.entries()) {
+          light.visible = lightVisibility[index] ?? true;
+        }
+      }
+    }
+
+    await waitForRendererFrame();
+  }
+
+  private warmShadowFrame(
+    object: THREE.Object3D,
+    camera: THREE.Camera,
+  ): void {
+    const previousRenderTarget = this.renderer.getRenderTarget();
+    const previousShadowAutoUpdate = this.renderer.shadowMap.autoUpdate;
+    const previousShadowNeedsUpdate = this.renderer.shadowMap.needsUpdate;
+    let completed = false;
+
+    try {
+      this.renderer.shadowMap.autoUpdate = false;
+      this.renderer.shadowMap.needsUpdate = true;
+      this.renderer.setRenderTarget(this.warmupTarget);
+      this.renderer.render(object, camera);
+      completed = true;
+    } finally {
+      this.renderer.setRenderTarget(previousRenderTarget);
+      this.renderer.shadowMap.autoUpdate = previousShadowAutoUpdate;
+      this.renderer.shadowMap.needsUpdate = completed
+        ? false
+        : previousShadowNeedsUpdate;
     }
   }
 
@@ -345,6 +409,23 @@ export class RendererManager {
   private readonly handleWindowResize = (): void => {
     this.resize();
   };
+}
+
+function waitForRendererFrame(): Promise<void> {
+  return new Promise((resolve) => {
+    let resolved = false;
+    const finish = (): void => {
+      if (resolved) {
+        return;
+      }
+
+      resolved = true;
+      window.clearTimeout(timeout);
+      resolve();
+    };
+    const timeout = window.setTimeout(finish, 100);
+    window.requestAnimationFrame(finish);
+  });
 }
 
 function normalizeAtmosphereAmount(value: number): number {

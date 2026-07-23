@@ -970,9 +970,24 @@ button {
   inset: 0;
   z-index: 14;
   display: grid;
+  visibility: hidden;
+  opacity: 0;
+  contain: layout paint;
   pointer-events: none;
   place-items: center;
   background: radial-gradient(circle at center, rgb(5 9 12 / 26%), transparent 46%);
+  transform: translateZ(0);
+  will-change: opacity, transform;
+}
+
+.story-memory.is-visible {
+  visibility: visible;
+  opacity: 1;
+}
+
+.story-memory.is-warming {
+  visibility: visible;
+  opacity: 0;
 }
 
 .story-memory__photograph {
@@ -984,13 +999,15 @@ button {
   outline: 1px solid rgb(5 6 5 / 80%);
   padding: 1.2rem 1.15rem 0.85rem;
   background:
-    linear-gradient(180deg, rgb(213 208 190 / 16%), rgb(23 28 28 / 38%)),
-    #6c706a;
+    linear-gradient(180deg, rgb(213 203 174 / 18%), rgb(26 30 26 / 42%)),
+    #696b5f;
   box-shadow:
     0 1.4rem 4rem rgb(0 0 0 / 68%),
     inset 0 0 3rem rgb(3 5 5 / 46%);
-  filter: sepia(0.24) saturate(0.65) contrast(1.08);
   transform: rotate(-1.4deg);
+}
+
+.story-memory.is-visible .story-memory__photograph {
   animation: story-memory-develop 3.4s ease both;
 }
 
@@ -1422,14 +1439,12 @@ button {
   0%,
   100% {
     opacity: 0;
-    filter: sepia(0.8) saturate(0) contrast(1.6) brightness(1.8);
     transform: rotate(-1.4deg) scale(0.96);
   }
 
   18%,
   78% {
     opacity: 0.96;
-    filter: sepia(0.24) saturate(0.65) contrast(1.08) brightness(1);
     transform: rotate(-1.4deg) scale(1);
   }
 }

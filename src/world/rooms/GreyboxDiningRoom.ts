@@ -386,10 +386,13 @@ export class GreyboxDiningRoom extends RoomRuntime implements PlayableRoom {
     this.createCollisions();
   }
 
+  protected override takeDeferredRoomReleaseTasks(): readonly (() => void)[] {
+    return this.assetLeases
+      .splice(0)
+      .map((lease) => () => lease.release());
+  }
+
   protected override onRoomReleased(): void {
-    for (const lease of this.assetLeases.splice(0)) {
-      lease.release();
-    }
     this.assetsLoaded = false;
     this.anomalyTargetRegistry.clear();
     this.materials = null;

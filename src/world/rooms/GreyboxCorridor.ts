@@ -535,11 +535,13 @@ export class GreyboxCorridor extends RoomRuntime implements PlayableRoom {
     this.createCollisions();
   }
 
-  protected override onRoomReleased(): void {
-    for (const lease of this.assetLeases.splice(0)) {
-      lease.release();
-    }
+  protected override takeDeferredRoomReleaseTasks(): readonly (() => void)[] {
+    return this.assetLeases
+      .splice(0)
+      .map((lease) => () => lease.release());
+  }
 
+  protected override onRoomReleased(): void {
     this.assetsLoaded = false;
     this.anomalyTargetRegistry.clear();
     this.materials = null;

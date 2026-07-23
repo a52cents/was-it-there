@@ -5,6 +5,7 @@ import {
   placeRoomEntranceAtExit,
   resolveExitDoorway,
   resolveEntranceDoorway,
+  resolveRoomPlayerSpawn,
   resetRoomPlacement,
   restoreRoomEntranceDoor,
 } from '../../src/world/SeamlessRoomTransition';
@@ -164,5 +165,61 @@ describe('SeamlessRoomTransition', () => {
       currentRoom.unmount();
       nextRoom.unmount();
     }
+  });
+
+  it('keeps chained rooms, exits and player spawns in world space', () => {
+    const bedroom = new GreyboxBedroom();
+    const bathroom = new GreyboxBathroom();
+    const corridor = new GreyboxCorridor();
+
+    for (const room of [bedroom, bathroom, corridor]) {
+      room.mount({
+        scene: new THREE.Scene(),
+        worldCollision: new WorldCollision(),
+      });
+    }
+
+    const bedroomExit = resolveExitDoorway(bedroom);
+    const bathroomPlacement = placeRoomEntranceAtExit(
+      bathroom,
+      bedroomExit,
+    );
+    const bathroomSpawn = resolveRoomPlayerSpawn(bathroom);
+    const expectedBathroomSpawn = bathroom.getPlayerSpawn();
+    const expectedWorldSpawn = new THREE.Vector3(
+      expectedBathroomSpawn.x,
+      expectedBathroomSpawn.y,
+      expectedBathroomSpawn.z,
+    )
+      .applyAxisAngle(
+        new THREE.Vector3(0, 1, 0),
+        bathroomPlacement.rotationY,
+      )
+      .add(bathroomPlacement.position);
+
+    expect(bathroomSpawn.x).toBeCloseTo(expectedWorldSpawn.x);
+    expect(bathroomSpawn.z).toBeCloseTo(expectedWorldSpawn.z);
+
+    const bathroomExit = resolveExitDoorway(bathroom);
+    const corridorPlacement = placeRoomEntranceAtExit(
+      corridor,
+      bathroomExit,
+    );
+    const corridorSpawn = resolveRoomPlayerSpawn(corridor);
+    const directionIntoCorridor = new THREE.Vector3(
+      corridorSpawn.x,
+      corridorSpawn.y,
+      corridorSpawn.z,
+    )
+      .sub(bathroomExit.center)
+      .setY(0)
+      .normalize();
+
+    expect(directionIntoCorridor.dot(bathroomExit.direction)).toBeCloseTo(1);
+    expect(corridorPlacement.position.lengthSq()).toBeGreaterThan(0);
+
+    bedroom.unmount();
+    bathroom.unmount();
+    corridor.unmount();
   });
 });

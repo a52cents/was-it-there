@@ -5,7 +5,10 @@ import type { ExitThresholdDefinition } from '../../gameplay/progression/ExitThr
 import type { PlayerSpawn } from '../../player/PlayerConfig';
 import type { AssetManager } from '../assets/AssetManager';
 import type { RoomDefinition } from '../RoomDefinition';
-import type { RoomRuntimeOptions } from '../RoomRuntime';
+import type {
+  RoomCleanupYield,
+  RoomRuntimeOptions,
+} from '../RoomRuntime';
 
 export interface PlayableRoom {
   readonly definition: RoomDefinition;
@@ -13,6 +16,10 @@ export interface PlayableRoom {
   mount(options: RoomRuntimeOptions): void;
   transferMount(options: RoomRuntimeOptions): void;
   unmount(): void;
+  unmountIncrementally(
+    yieldBetweenBatches: RoomCleanupYield,
+    batchSize?: number,
+  ): Promise<void>;
   isMounted(): boolean;
   getVisualRoot(): THREE.Group;
   getCollisionRoot(): THREE.Group;

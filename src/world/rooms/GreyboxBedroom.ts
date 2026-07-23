@@ -940,22 +940,19 @@ export class GreyboxBedroom extends RoomRuntime implements PlayableRoom {
     this.createFurnitureCollisions();
   }
 
-  protected override onRoomReleased(): void {
-    for (const lease of this.finalFurnitureLeases) {
-      lease.release();
-    }
-
-    for (const lease of this.finalAnomalyTargetLeases) {
-      lease.release();
-    }
-
-    for (const lease of this.finalDecorLeases) {
-      lease.release();
-    }
-
+  protected override takeDeferredRoomReleaseTasks(): readonly (() => void)[] {
+    const leases = [
+      ...this.finalFurnitureLeases,
+      ...this.finalAnomalyTargetLeases,
+      ...this.finalDecorLeases,
+    ];
     this.finalFurnitureLeases.length = 0;
     this.finalAnomalyTargetLeases.length = 0;
     this.finalDecorLeases.length = 0;
+    return leases.map((lease) => () => lease.release());
+  }
+
+  protected override onRoomReleased(): void {
     this.finalFurnitureLoaded = false;
     this.finalAnomalyTargetsLoaded = false;
     this.finalDecorLoaded = false;

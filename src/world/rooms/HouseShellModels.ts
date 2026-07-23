@@ -244,24 +244,28 @@ export async function installHouseShellModels(
 }
 
 export function releaseHouseShellModels(owner: object): void {
+  for (const release of takeHouseShellReleaseTasks(owner)) {
+    release();
+  }
+}
+
+export function takeHouseShellReleaseTasks(
+  owner: object,
+): readonly (() => void)[] {
   const state = installedRooms.get(owner);
 
   if (state === undefined) {
-    return;
+    return [];
   }
 
   installedRooms.delete(owner);
-
-  for (const lease of state.leases) {
-    lease.release();
-  }
-
-  for (const texture of state.textures) {
-    texture.dispose();
-  }
-
+  const releases = [
+    ...state.leases.map((lease) => () => lease.release()),
+    ...state.textures.map((texture) => () => texture.dispose()),
+  ];
   state.leases = [];
   state.textures = [];
+  return releases;
 }
 
 async function performInstallation(

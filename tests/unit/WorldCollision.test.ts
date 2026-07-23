@@ -160,4 +160,25 @@ describe('WorldCollision', () => {
     expect(active.intersectCapsule(createCapsule(0.2, 0, 0))).toBeNull();
     expect(prepared.isReady()).toBe(false);
   });
+
+  it('builds closed and open door variants in one geometry pass', () => {
+    const root = createRoot(
+      { size: [4, 0.2, 4], position: [0, -0.1, 0] },
+      { size: [0.2, 3, 4], position: [0, 1.5, 0] },
+    );
+    const door = root.children[1];
+
+    if (door === undefined) {
+      throw new Error('Expected a door collision mesh.');
+    }
+
+    const closed = new WorldCollision();
+    const open = new WorldCollision();
+    closed.buildVariantsFromObject(root, open, [door]);
+
+    expect(closed.getTriangleCount()).toBe(24);
+    expect(open.getTriangleCount()).toBe(12);
+    expect(closed.intersectCapsule(createCapsule(0.2, 0, 0))).not.toBeNull();
+    expect(open.intersectCapsule(createCapsule(0.2, 0, 0))).toBeNull();
+  });
 });

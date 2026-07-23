@@ -8,8 +8,10 @@ import {
 
 class MemoryStorage implements StorySaveStorage {
   public readonly values = new Map<string, string>();
+  public readCount = 0;
 
   public getItem(key: string): string | null {
+    this.readCount += 1;
     return this.values.get(key) ?? null;
   }
 
@@ -96,6 +98,30 @@ describe('StorySaveRepository', () => {
       escapeUnlocked: true,
       progress: createEmptyStoryProgress(),
     });
+  });
+
+  it('keeps access state in memory across progress commits', () => {
+    const storage = new MemoryStorage();
+    storage.values.set(
+      STORY_SAVE_STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        escapeUnlocked: true,
+        progress: createEmptyStoryProgress(),
+      }),
+    );
+    const repository = new StorySaveRepository(storage);
+
+    expect(repository.load().escapeUnlocked).toBe(true);
+    expect(storage.readCount).toBe(1);
+    expect(
+      repository.saveProgress({
+        ...createEmptyStoryProgress(),
+        discoveries: ['photo'],
+      }),
+    ).toBe(true);
+    expect(repository.unlockEscape()).toBe(true);
+    expect(storage.readCount).toBe(1);
   });
 
   it('falls back cleanly for corrupt progress data', () => {

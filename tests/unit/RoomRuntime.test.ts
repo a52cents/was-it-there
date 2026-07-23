@@ -19,6 +19,7 @@ class TestRoom extends RoomRuntime {
   } as const satisfies RoomDefinition;
 
   public lastVisualGeometry: THREE.BoxGeometry | null = null;
+  public lastMaterial: THREE.MeshBasicMaterial | null = null;
   public lastTexture: THREE.Texture | null = null;
 
   public constructor() {
@@ -39,11 +40,13 @@ class TestRoom extends RoomRuntime {
     this.getVisualRoot().add(visual);
     this.getCollisionRoot().add(collision);
     this.lastVisualGeometry = visualGeometry;
+    this.lastMaterial = material;
     this.lastTexture = texture;
   }
 
   protected override onRoomReleased(): void {
     this.lastVisualGeometry = null;
+    this.lastMaterial = null;
     this.lastTexture = null;
   }
 }
@@ -220,6 +223,41 @@ describe('RoomRuntime', () => {
     expect(room.lastVisualGeometry).not.toBe(firstGeometry);
     expect(world.isReady()).toBe(true);
     room.unmount();
+  });
+
+  it('detaches immediately and releases resources across cleanup batches', async () => {
+    const room = new TestRoom();
+    const scene = new THREE.Scene();
+    const world = new WorldCollision();
+    room.mount({ scene, worldCollision: world });
+    const geometry = room.lastVisualGeometry;
+    const material = room.lastMaterial;
+    const texture = room.lastTexture;
+
+    if (geometry === null || material === null || texture === null) {
+      throw new Error('Expected the test room to create owned resources.');
+    }
+
+    const disposeGeometry = vi.spyOn(geometry, 'dispose');
+    const disposeMaterial = vi.spyOn(material, 'dispose');
+    const disposeTexture = vi.spyOn(texture, 'dispose');
+    const yieldBetweenBatches = vi.fn(() => Promise.resolve());
+    const release = room.unmountIncrementally(yieldBetweenBatches, 1);
+
+    expect(room.isMounted()).toBe(false);
+    expect(scene.children).not.toContain(room.getVisualRoot());
+    expect(disposeGeometry).not.toHaveBeenCalled();
+    expect(disposeMaterial).not.toHaveBeenCalled();
+    expect(disposeTexture).not.toHaveBeenCalled();
+
+    await release;
+
+    expect(room.getVisualRoot().children).toHaveLength(0);
+    expect(room.getCollisionRoot().children).toHaveLength(0);
+    expect(disposeGeometry).toHaveBeenCalled();
+    expect(disposeMaterial).toHaveBeenCalledOnce();
+    expect(disposeTexture).toHaveBeenCalledOnce();
+    expect(yieldBetweenBatches.mock.calls.length).toBeGreaterThan(5);
   });
 
   it('allows repeated unmount calls without retaining state', () => {

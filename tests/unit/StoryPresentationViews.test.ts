@@ -19,13 +19,36 @@ class FakeElement {
   public removed = false;
   public readonly children: unknown[] = [];
   public readonly dataset: Record<string, string> = {};
+  public readonly attributes = new Map<string, string>();
+  public readonly classList = {
+    add: (...classNames: string[]): void => {
+      const classes = new Set(this.className.split(/\s+/).filter(Boolean));
+
+      for (const className of classNames) {
+        classes.add(className);
+      }
+
+      this.className = [...classes].join(' ');
+    },
+    remove: (...classNames: string[]): void => {
+      const removedClasses = new Set(classNames);
+      this.className = this.className
+        .split(/\s+/)
+        .filter((className) => className && !removedClasses.has(className))
+        .join(' ');
+    },
+    contains: (className: string): boolean =>
+      this.className.split(/\s+/).includes(className),
+  };
 
   public constructor(
     public readonly ownerDocument: FakeDocument,
     public readonly tagName: string,
   ) {}
 
-  public setAttribute(_name: string, _value: string): void {}
+  public setAttribute(name: string, value: string): void {
+    this.attributes.set(name, value);
+  }
 
   public append(...children: unknown[]): void {
     this.children.push(...children);
@@ -81,13 +104,16 @@ describe('Story presentation views', () => {
     const view = new StoryMemoryView(root as unknown as HTMLElement);
     const element = getElement(document, 'story-memory');
 
-    expect(element.hidden).toBe(true);
+    expect(element.classList.contains('is-visible')).toBe(false);
+    expect(element.attributes.get('aria-hidden')).toBe('true');
     view.show('bedroom-empty-place');
-    expect(element.hidden).toBe(false);
+    expect(element.classList.contains('is-visible')).toBe(true);
+    expect(element.attributes.get('aria-hidden')).toBe('false');
     expect(element.dataset.effect).toBe('bedroom-empty-place');
 
     view.update(3_400);
-    expect(element.hidden).toBe(true);
+    expect(element.classList.contains('is-visible')).toBe(false);
+    expect(element.attributes.get('aria-hidden')).toBe('true');
     expect(element.dataset.effect).toBeUndefined();
 
     view.dispose();
@@ -102,7 +128,7 @@ describe('Story presentation views', () => {
 
     expect(getElement(document, 'story-memory__reconstruction')).toBeDefined();
     view.show('dining-reconstruction');
-    expect(element.hidden).toBe(false);
+    expect(element.classList.contains('is-visible')).toBe(true);
     expect(element.dataset.effect).toBe('dining-reconstruction');
   });
 });
