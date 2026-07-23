@@ -51,6 +51,9 @@ export const AUDIO_CUE_IDS = [
   'house-pressure-1',
   'house-pressure-2',
   'house-takeover',
+  'ambient-knock',
+  'ambient-footsteps',
+  'ambient-whisper',
   ...STORY_AUDIO_CUE_IDS,
   'door-unlock',
   'door-open',
@@ -99,6 +102,7 @@ export class AudioManager {
   };
   private readonly activeCues = new Map<AudioCueId, ActiveCue>();
   private horrorScoreBuffer: AudioBuffer | null = null;
+  private ambientCueSequence = 0;
   private muted = false;
   private disposed = false;
 
@@ -226,6 +230,39 @@ export class AudioManager {
           durationSeconds: 1.45,
           maximumVolume: 0.026,
         });
+        break;
+      case 'ambient-knock':
+        this.playAmbientBufferCue(
+          id,
+          this.createKnockBuffer(this.context),
+          'lowpass',
+          720,
+          1.8,
+          0.2,
+          0.74,
+        );
+        break;
+      case 'ambient-footsteps':
+        this.playAmbientBufferCue(
+          id,
+          this.createFootstepBuffer(this.context),
+          'lowpass',
+          930,
+          0.9,
+          0.15,
+          3.15,
+        );
+        break;
+      case 'ambient-whisper':
+        this.playAmbientBufferCue(
+          id,
+          this.createWhisperBuffer(this.context),
+          'bandpass',
+          1_650,
+          0.7,
+          0.052,
+          2.85,
+        );
         break;
       case 'story-radio-burst':
         this.playToneCue({
@@ -759,6 +796,158 @@ export class AudioManager {
     return this.horrorScoreBuffer;
   }
 
+  private playAmbientBufferCue(
+    id: 'ambient-knock' | 'ambient-footsteps' | 'ambient-whisper',
+    buffer: AudioBuffer,
+    filterType: BiquadFilterType,
+    filterFrequency: number,
+    filterQ: number,
+    maximumVolume: number,
+    durationSeconds: number,
+  ): void {
+    const context = this.context;
+
+    if (context === null) {
+      return;
+    }
+
+    this.stop(id);
+    const source = context.createBufferSource();
+    const filter = context.createBiquadFilter();
+    const gain = context.createGain();
+    const now = context.currentTime;
+    source.buffer = buffer;
+    filter.type = filterType;
+    filter.frequency.setValueAtTime(filterFrequency, now);
+    filter.Q.setValueAtTime(filterQ, now);
+    gain.gain.setValueAtTime(maximumVolume, now);
+    gain.gain.setValueAtTime(maximumVolume, now + durationSeconds);
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.requireCategoryGain('ambience'));
+
+    this.activateCue(id, [source], [source, filter, gain]);
+    source.start(now);
+    source.stop(now + durationSeconds + 0.01);
+  }
+
+  private createKnockBuffer(context: AudioContext): AudioBuffer {
+    const durationSeconds = 0.74;
+    const buffer = this.createStereoBuffer(context, durationSeconds);
+    const left = buffer.getChannelData(0);
+    const right = buffer.getChannelData(1);
+    const knockTimes = [0.04, 0.22, 0.47] as const;
+    const random = this.createAmbientRandom(0x4b4e4f43);
+    const pan = random() * 1.4 - 0.7;
+    const [leftPan, rightPan] = equalPowerPan(pan);
+
+    for (let index = 0; index < left.length; index += 1) {
+      const time = index / context.sampleRate;
+      let sample = 0;
+
+      for (const knockTime of knockTimes) {
+        const elapsed = time - knockTime;
+
+        if (elapsed < 0 || elapsed > 0.12) {
+          continue;
+        }
+
+        const envelope = Math.exp(-elapsed * 38);
+        const body = Math.sin(elapsed * Math.PI * 2 * 92);
+        sample += (body * 0.82 + (random() * 2 - 1) * 0.28) * envelope;
+      }
+
+      left[index] = sample * leftPan;
+      right[index] = sample * rightPan;
+    }
+
+    return buffer;
+  }
+
+  private createFootstepBuffer(context: AudioContext): AudioBuffer {
+    const durationSeconds = 3.15;
+    const buffer = this.createStereoBuffer(context, durationSeconds);
+    const left = buffer.getChannelData(0);
+    const right = buffer.getChannelData(1);
+    const stepTimes = [0.12, 0.62, 1.13, 1.66, 2.22, 2.78] as const;
+    const random = this.createAmbientRandom(0x53544550);
+    const startsOnLeft = random() < 0.5;
+
+    for (let index = 0; index < left.length; index += 1) {
+      const time = index / context.sampleRate;
+
+      for (let stepIndex = 0; stepIndex < stepTimes.length; stepIndex += 1) {
+        const stepTime = stepTimes[stepIndex] as number;
+        const elapsed = time - stepTime;
+
+        if (elapsed < 0 || elapsed > 0.18) {
+          continue;
+        }
+
+        const travel = stepIndex / (stepTimes.length - 1);
+        const pan = (startsOnLeft ? -0.82 : 0.82) * (1 - travel * 2);
+        const [leftPan, rightPan] = equalPowerPan(pan);
+        const envelope = Math.exp(-elapsed * 24);
+        const heel = Math.sin(elapsed * Math.PI * 2 * (66 + stepIndex * 3));
+        const texture = random() * 2 - 1;
+        const sample = (heel * 0.68 + texture * 0.38) * envelope;
+        left[index] = (left[index] ?? 0) + sample * leftPan;
+        right[index] = (right[index] ?? 0) + sample * rightPan;
+      }
+    }
+
+    return buffer;
+  }
+
+  private createWhisperBuffer(context: AudioContext): AudioBuffer {
+    const durationSeconds = 2.85;
+    const buffer = this.createStereoBuffer(context, durationSeconds);
+    const left = buffer.getChannelData(0);
+    const right = buffer.getChannelData(1);
+    const random = this.createAmbientRandom(0x57535052);
+    const direction = random() < 0.5 ? -1 : 1;
+
+    for (let index = 0; index < left.length; index += 1) {
+      const time = index / context.sampleRate;
+      const progress = time / durationSeconds;
+      const fade = Math.sin(Math.PI * progress) ** 1.4;
+      const syllables =
+        0.22 +
+        Math.max(0, Math.sin(time * Math.PI * 4.8)) * 0.58 +
+        Math.max(0, Math.sin(time * Math.PI * 7.1 + 1.4)) * 0.2;
+      const breath = (random() * 2 - 1) * fade * syllables;
+      const pan = direction * (0.2 + progress * 0.62);
+      const [leftPan, rightPan] = equalPowerPan(pan);
+      left[index] = breath * leftPan;
+      right[index] = breath * rightPan;
+    }
+
+    return buffer;
+  }
+
+  private createStereoBuffer(
+    context: AudioContext,
+    durationSeconds: number,
+  ): AudioBuffer {
+    const frameCount = Math.max(
+      1,
+      Math.floor(context.sampleRate * durationSeconds),
+    );
+    return context.createBuffer(2, frameCount, context.sampleRate);
+  }
+
+  private createAmbientRandom(seed: number): () => number {
+    this.ambientCueSequence += 1;
+    let state = (seed ^ Math.imul(this.ambientCueSequence, 0x9e3779b1)) >>> 0;
+
+    return () => {
+      state ^= state << 13;
+      state ^= state >>> 17;
+      state ^= state << 5;
+      return (state >>> 0) / UINT32_RANGE;
+    };
+  }
+
   private playToneCue(options: {
     readonly id: Exclude<AudioCueId, 'game-soundtrack' | 'room-ambience'>;
     readonly category: RoutedAudioCategory;
@@ -860,4 +1049,10 @@ export class AudioManager {
     parameter.cancelScheduledValues(now);
     parameter.setValueAtTime(value, now);
   }
+}
+
+function equalPowerPan(pan: number): readonly [number, number] {
+  const safePan = Math.min(1, Math.max(-1, pan));
+  const angle = ((safePan + 1) * Math.PI) / 4;
+  return [Math.cos(angle), Math.sin(angle)];
 }

@@ -16,6 +16,11 @@ export type RoomPreloadErrorHandler = (
   error: unknown,
 ) => void;
 
+export type RoomPreloadPreparation<TRoom> = (
+  room: TRoom,
+  roomIndex: number,
+) => Promise<void>;
+
 interface RoomPreload<TRoom extends PreloadableRoom> {
   readonly roomIndex: number;
   readonly room: TRoom;
@@ -24,12 +29,14 @@ interface RoomPreload<TRoom extends PreloadableRoom> {
 }
 
 export class RoomPreloader<TRoom extends PreloadableRoom> {
-  private preload: RoomPreload<TRoom> | null = null;
+  private readonly preloads = new Map<number, RoomPreload<TRoom>>();
 
   public constructor(
     private readonly assetManager: AssetManager,
     private readonly createRoom: (roomIndex: number) => TRoom,
     private readonly onError: RoomPreloadErrorHandler = () => undefined,
+    private readonly prepareRoom: RoomPreloadPreparation<TRoom> =
+      () => Promise.resolve(),
   ) {}
 
   public preloadRoom(roomIndex: number): Promise<boolean> {
@@ -41,11 +48,12 @@ export class RoomPreloader<TRoom extends PreloadableRoom> {
       );
     }
 
-    if (this.preload?.roomIndex === roomIndex) {
-      return this.preload.ready.then((room) => room !== null);
+    const existing = this.preloads.get(roomIndex);
+
+    if (existing !== undefined) {
+      return existing.ready.then((room) => room !== null);
     }
 
-    this.cancel();
     let room: TRoom;
 
     try {
@@ -67,7 +75,14 @@ export class RoomPreloader<TRoom extends PreloadableRoom> {
     };
     preload.ready = room
       .loadAssets(this.assetManager)
-      .then(() => (room.isMounted() ? room : null))
+      .then(async () => {
+        if (!room.isMounted() || preload.cancelled) {
+          return null;
+        }
+
+        await this.prepareRoom(room, roomIndex);
+        return room.isMounted() && !preload.cancelled ? room : null;
+      })
       .catch((error: unknown) => {
         room.unmount();
 
@@ -75,10 +90,14 @@ export class RoomPreloader<TRoom extends PreloadableRoom> {
           this.onError(roomIndex, error);
         }
 
+        if (this.preloads.get(roomIndex) === preload) {
+          this.preloads.delete(roomIndex);
+        }
+
         return null;
       });
 
-    this.preload = preload;
+    this.preloads.set(roomIndex, preload);
     return preload.ready.then((loadedRoom) => loadedRoom !== null);
   }
 
@@ -86,16 +105,16 @@ export class RoomPreloader<TRoom extends PreloadableRoom> {
     roomIndex: number,
     options: RoomRuntimeOptions,
   ): Promise<TRoom | null> {
-    const preload = this.preload;
+    const preload = this.preloads.get(roomIndex);
 
-    if (preload === null || preload.roomIndex !== roomIndex) {
+    if (preload === undefined) {
       return null;
     }
 
     const room = await preload.ready;
 
-    if (this.preload === preload) {
-      this.preload = null;
+    if (this.preloads.get(roomIndex) === preload) {
+      this.preloads.delete(roomIndex);
     }
 
     if (room === null || !room.isMounted()) {
@@ -112,16 +131,21 @@ export class RoomPreloader<TRoom extends PreloadableRoom> {
   }
 
   public getPendingRoomIndex(): number | null {
-    return this.preload?.roomIndex ?? null;
+    return this.getPendingRoomIndices()[0] ?? null;
+  }
+
+  public getPendingRoomIndices(): readonly number[] {
+    return [...this.preloads.keys()].sort((first, second) => first - second);
   }
 
   public cancel(): void {
-    const preload = this.preload;
-    this.preload = null;
-    if (preload !== null) {
+    const preloads = [...this.preloads.values()];
+    this.preloads.clear();
+
+    for (const preload of preloads) {
       preload.cancelled = true;
+      preload.room.unmount();
     }
-    preload?.room.unmount();
   }
 
   public dispose(): void {

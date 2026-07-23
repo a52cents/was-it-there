@@ -25,7 +25,10 @@ export interface PlayableRoom {
   getAnomalyTargetRegistry(): AnomalyTargetRegistry;
   loadAssets(assetManager?: AssetManager): Promise<void>;
   getExitDoor(): THREE.Object3D | null;
-  setExitDoorCollisionEnabled(enabled: boolean): void;
+  setExitDoorCollisionEnabled(
+    enabled: boolean,
+    rebuildCollision?: boolean,
+  ): void;
   setExitPortalProgress(progress: number): void;
   getExitThresholdDefinition(): ExitThresholdDefinition;
 }

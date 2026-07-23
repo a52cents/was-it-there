@@ -120,7 +120,6 @@ export class StoryMemoryView {
 
   public show(effectId: StoryScreenEffectId): void {
     this.element.hidden = true;
-    void this.element.offsetWidth;
     this.element.dataset.effect = effectId;
     this.remainingMs = STORY_MEMORY_DURATION_MS;
     this.element.hidden = false;
@@ -150,6 +149,10 @@ export class StoryMemoryView {
 
   public resume(): void {
     this.paused = false;
+  }
+
+  public isVisible(): boolean {
+    return !this.element.hidden;
   }
 
   public hide(): void {

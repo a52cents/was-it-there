@@ -141,6 +141,33 @@ describe('RoomRuntime', () => {
     room.unmount();
   });
 
+  it('can transfer visuals while leaving the active collision world untouched', () => {
+    const activeRoom = new TestRoom();
+    const stagedRoom = new TestRoom();
+    const gameplayScene = new THREE.Scene();
+    const gameplayWorld = new WorldCollision();
+    activeRoom.mount({
+      scene: gameplayScene,
+      worldCollision: gameplayWorld,
+    });
+    stagedRoom.mount({
+      scene: new THREE.Scene(),
+      worldCollision: new WorldCollision(),
+    });
+
+    stagedRoom.transferMount({
+      scene: gameplayScene,
+      worldCollision: gameplayWorld,
+      activateCollision: false,
+    });
+
+    expect(gameplayScene.children).toContain(stagedRoom.getVisualRoot());
+    expect(gameplayWorld.getSourceRoot()).toBe(activeRoom.getCollisionRoot());
+
+    stagedRoom.unmount();
+    activeRoom.unmount();
+  });
+
   it('rejects transferring a room that has not been mounted', () => {
     const room = new TestRoom();
 

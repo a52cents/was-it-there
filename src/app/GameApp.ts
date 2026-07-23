@@ -50,7 +50,10 @@ import {
   HousePressureSystem,
   type HousePressureSnapshot,
 } from '../gameplay/story/HousePressureSystem';
-import { StoryProgress } from '../gameplay/story/StoryProgress';
+import {
+  StoryProgress,
+  type PersistentStoryProgressSnapshot,
+} from '../gameplay/story/StoryProgress';
 import {
   StorySaveRepository,
   createEmptyStoryProgress,
@@ -87,6 +90,17 @@ import { StoryNotebookScreen } from '../ui/StoryNotebookScreen';
 import { StorySubtitleView } from '../ui/StorySubtitleView';
 import { VictoryScreen } from '../ui/VictoryScreen';
 import { AssetManager } from '../world/assets/AssetManager';
+import {
+  applyRoomPlacement,
+  openRoomEntranceDoor,
+  placeRoomEntranceAtExit,
+  resetRoomPlacement,
+  restoreRoomEntranceDoor,
+  resolveEntranceDoorway,
+  resolveExitDoorway,
+  type OpenRoomEntrance,
+  type SeamlessRoomPlacement,
+} from '../world/SeamlessRoomTransition';
 import { GreyboxBathroom } from '../world/rooms/GreyboxBathroom';
 import { GreyboxBedroom } from '../world/rooms/GreyboxBedroom';
 import { GreyboxCorridor } from '../world/rooms/GreyboxCorridor';
@@ -129,6 +143,11 @@ export interface GameAppElements {
   readonly escapeModeButton: HTMLButtonElement;
   readonly escapeModeDescription: HTMLElement;
   readonly storyNotebookButton: HTMLButtonElement;
+  readonly startLoader: HTMLElement;
+  readonly startLoaderLabel: HTMLElement;
+  readonly startLoaderValue: HTMLElement;
+  readonly startLoaderTrack: HTMLElement;
+  readonly startLoaderBar: HTMLElement;
   readonly pointerLockPrompt: HTMLButtonElement;
 }
 
@@ -139,6 +158,24 @@ const POINTER_LOCK_COPY = {
 } as const;
 
 const GAME_OVER_FADE_DURATION_MS = 650;
+const PRELOAD_ROOM_LOOKAHEAD = 1;
+const ROOM_COUNT = 10;
+
+interface StagedRoomTransition {
+  readonly roomIndex: number;
+  readonly room: PlayableRoom;
+  readonly placement: SeamlessRoomPlacement;
+  readonly prepared: PreparedRoomTransition;
+}
+
+interface PreparedRoomTransition {
+  readonly anomalySystem: RoomAnomalySystem;
+  entrance: OpenRoomEntrance;
+  readonly activeCollision: WorldCollision;
+  readonly openExitCollision: WorldCollision;
+  readonly collisionTarget: { world: WorldCollision };
+  preparedRunKey: string | null;
+}
 
 const LEVEL_BUILDER_ROOMS = ESCAPE_ROUTE.slice(0, 10).map((step) => ({
   roomIndex: step.roomIndex,
@@ -190,7 +227,13 @@ export class GameApp {
     (roomIndex, error) => {
       console.warn(`Room ${roomIndex + 1} could not be preloaded.`, error);
     },
+    (room, roomIndex) => this.preparePreloadedRoom(room, roomIndex),
   );
+  private readonly preparedRoomTransitions =
+    new WeakMap<PlayableRoom, PreparedRoomTransition>();
+  private readonly openExitCollisions =
+    new WeakMap<PlayableRoom, WorldCollision>();
+  private readonly retiredRooms = new Set<PlayableRoom>();
   private readonly roomProgression = new EscapeRouteProgression();
   private readonly storyProgress = new StoryProgress();
   private readonly storyInteractionRegistry = new StoryInteractionRegistry(
@@ -215,6 +258,9 @@ export class GameApp {
   private exitThresholdDetector: ExitThresholdDetector;
   private readonly unsubscribeGameState: () => void;
   private unsubscribeStoryProgress: (() => void) | null = null;
+  private pendingStoryProgress: PersistentStoryProgressSnapshot | null =
+    null;
+  private storyProgressCommitScheduled = false;
 
   private initialized = false;
   private destroyed = false;
@@ -233,7 +279,14 @@ export class GameApp {
   private gameOverRevealTarget: THREE.Object3D | null = null;
   private readonly gameOverRevealCenter = new THREE.Vector3();
   private roomTransitionPromise: Promise<void> | null = null;
+  private seamlessRoomStagePromise: Promise<StagedRoomTransition> | null =
+    null;
+  private stagedRoomTransition: StagedRoomTransition | null = null;
+  private seamlessRoomStageVersion = 0;
+  private roomPreloadWindowVersion = 0;
   private levelBuilderRoomChangePromise: Promise<void> | null = null;
+  private exitUnlockPending = false;
+  private exitStageRequested = false;
 
   public constructor(
     private readonly elements: GameAppElements,
@@ -265,7 +318,7 @@ export class GameApp {
     this.exitDoorController = new ExitDoorController({
       getDoor: () => this.room.getExitDoor(),
       setCollisionEnabled: (enabled) =>
-        this.room.setExitDoorCollisionEnabled(enabled),
+        this.setRoomExitDoorCollisionEnabled(this.room, enabled),
       setPortalProgress: (progress) =>
         this.room.setExitPortalProgress(progress),
     });
@@ -285,6 +338,11 @@ export class GameApp {
       elements.escapeModeButton,
       elements.escapeModeDescription,
       elements.storyNotebookButton,
+      elements.startLoader,
+      elements.startLoaderLabel,
+      elements.startLoaderValue,
+      elements.startLoaderTrack,
+      elements.startLoaderBar,
     );
     this.storyIntroScreen = new StoryIntroScreen(elements.modalLayer);
     this.pauseScreen = new PauseScreen(
@@ -362,8 +420,6 @@ export class GameApp {
         onFrameEnd: () => this.inputManager.endFrame(),
       },
     );
-    this.debugRuntime = this.createDebugRuntime();
-
     elements.pointerLockPrompt.addEventListener(
       'click',
       this.handleResumeClick,
@@ -380,11 +436,13 @@ export class GameApp {
     }
 
     this.startScreen.setBusy(true);
+    this.startScreen.setLoadingProgress(0.05, 'INITIALIZING SYSTEMS');
     this.gameStateMachine.transitionTo('loading');
     await Promise.all([
       this.platformManager.initialize(),
       this.audioManager.initialize(),
     ]);
+    this.startScreen.setLoadingProgress(0.12, 'LOADING ROOM 1 / 10');
 
     const platform = this.platformManager.activeAdapter;
     platform.loadingStart();
@@ -394,12 +452,33 @@ export class GameApp {
         this.room.loadAssets(this.assetManager),
         this.loadAmbientEnvironment(),
       ]);
+      this.startScreen.setLoadingProgress(0.2, 'PREPARING ROOM 1 / 10');
       this.housePressureLighting.bind(
         this.room.getVisualRoot(),
         this.scene,
       );
       this.registerActiveRoomCatalog();
       this.rendererManager.resize();
+      this.prepareOpenExitCollision(this.room);
+      await this.rendererManager.prepareObject(
+        this.room.getVisualRoot(),
+        this.cameraManager.camera,
+        this.scene,
+      );
+      await this.preloadAllFutureRooms((roomIndex) => {
+        const loadedRoomCount = roomIndex + 1;
+        const progress = 0.2 + (loadedRoomCount / ROOM_COUNT) * 0.72;
+        this.startScreen.setLoadingProgress(
+          progress,
+          `LOADING ROOM ${loadedRoomCount} / ${ROOM_COUNT}`,
+        );
+      });
+      this.startScreen.setLoadingProgress(0.94, 'CONNECTING ROOM 2 / 10');
+      await this.prepareSeamlessNextRoom();
+      this.rendererManager.invalidateShadows();
+      this.render();
+      await yieldToMainThread();
+      this.startScreen.setLoadingProgress(1, '10 ROOMS READY');
       this.desktopInput.attach();
       this.touchInput.attach();
       this.startScreen.onStart((mode) => this.startExperience(mode));
@@ -407,8 +486,7 @@ export class GameApp {
       this.storyProgress.hydrate(storySave.progress);
       this.unsubscribeStoryProgress = this.storyProgress.subscribe(
         (progress) => {
-          this.storySaveRepository.saveProgress(progress);
-          this.storyNotebookScreen.refresh(progress);
+          this.scheduleStoryProgressCommit(progress);
         },
       );
       this.startScreen.setEscapeUnlocked(storySave.escapeUnlocked);
@@ -428,6 +506,7 @@ export class GameApp {
     }
 
     this.destroyed = true;
+    this.roomPreloadWindowVersion += 1;
     this.setGameplayActive(false);
     this.gameLoop.stop();
     this.startScreen.dispose();
@@ -446,12 +525,15 @@ export class GameApp {
     this.victoryScreen.dispose();
     this.targetReportHighlight.dispose(this.scene);
     this.debugRuntime?.dispose();
+    this.cancelSeamlessRoomStage();
     this.roomPreloader.dispose();
+    this.disposeRetiredRooms();
     this.desktopInput.detach();
     this.touchInput.detach();
     this.unsubscribeGameState();
     this.unsubscribeStoryProgress?.();
     this.unsubscribeStoryProgress = null;
+    this.commitPendingStoryProgress();
     this.runTimer.stop();
     this.storyDirector.stop();
     this.houseErasureSystem.release();
@@ -527,6 +609,7 @@ export class GameApp {
     this.gameStateMachine.transitionTo('room-intro');
     this.resetPlayer();
     this.rendererManager.resize();
+    this.render();
     this.gameLoop.start();
     this.setGameplayActive(true);
     const audioUnlock = this.unlockAudio();
@@ -554,6 +637,14 @@ export class GameApp {
     }
 
     const state = this.gameStateMachine.currentState;
+    if (
+      state === 'observation' ||
+      state === 'search' ||
+      state === 'room-complete'
+    ) {
+      this.roomAudioDirector.update(deltaSeconds * 1_000);
+    }
+
     if (state !== 'failure-sequence') {
       const deltaMs = deltaSeconds * 1_000;
       this.storyDirector.update(deltaMs);
@@ -614,6 +705,7 @@ export class GameApp {
         }
       }
     } else if (state === 'room-complete') {
+      this.releasePendingExitUnlock();
       this.exitDoorController.update(deltaSeconds);
       const door = this.exitDoorController.getSnapshot();
 
@@ -716,20 +808,18 @@ export class GameApp {
     );
   }
 
-  private configureRoomGameplaySystems(room: PlayableRoom): void {
+  private configureRoomGameplaySystems(
+    room: PlayableRoom,
+    anomalySystem = this.createRoomAnomalySystem(room),
+  ): void {
     this.targetSelector = new AnomalyTargetSelector(
       room.getAnomalyTargetRegistry(),
     );
-    this.anomalySystem = new RoomAnomalySystem(
-      room.getAnomalyTargetRegistry(),
-      () => {
-        this.worldCollision.buildFromObject(room.getCollisionRoot());
-      },
-    );
+    this.anomalySystem = anomalySystem;
     this.exitDoorController = new ExitDoorController({
       getDoor: () => room.getExitDoor(),
       setCollisionEnabled: (enabled) =>
-        room.setExitDoorCollisionEnabled(enabled),
+        this.setRoomExitDoorCollisionEnabled(room, enabled),
       setPortalProgress: (progress) => room.setExitPortalProgress(progress),
     });
     this.exitThresholdDetector = new ExitThresholdDetector(
@@ -737,7 +827,23 @@ export class GameApp {
     );
   }
 
+  private createRoomAnomalySystem(room: PlayableRoom): RoomAnomalySystem {
+    return new RoomAnomalySystem(
+      room.getAnomalyTargetRegistry(),
+      () => {
+        this.worldCollision.buildFromObject(room.getCollisionRoot());
+      },
+    );
+  }
+
   private registerActiveRoomCatalog(): void {
+    this.registerRoomCatalog(this.room, this.anomalySystem);
+  }
+
+  private registerRoomCatalog(
+    room: PlayableRoom,
+    anomalySystem: RoomAnomalySystem,
+  ): void {
     const catalogs = {
       bathroom: bathroomAnomalyCatalog,
       'first-corridor': corridorAnomalyCatalog,
@@ -750,17 +856,17 @@ export class GameApp {
       'main-hall': mainHallAnomalyCatalog,
       office: officeAnomalyCatalog,
     } as const;
-    const catalog = catalogs[this.room.definition.id as keyof typeof catalogs];
+    const catalog = catalogs[room.definition.id as keyof typeof catalogs];
 
     if (catalog === undefined) {
       throw new Error(
-        `No Level Builder catalog is registered for room "${this.room.definition.id}".`,
+        `No Level Builder catalog is registered for room "${room.definition.id}".`,
       );
     }
 
-    this.anomalySystem.registerLevelBuilderCatalog(
+    anomalySystem.registerLevelBuilderCatalog(
       parseLevelBuilderDocument(JSON.stringify(catalog)),
-      this.room.definition.id,
+      room.definition.id,
     );
   }
 
@@ -792,64 +898,41 @@ export class GameApp {
 
     const previousRoom = this.room;
     const nextRoomIndex = this.roomProgression.currentStep.roomIndex + 1;
-    let nextRoom: PlayableRoom | null = null;
-    this.setGameplayActive(false);
+    const stagedTransition = await this.prepareSeamlessNextRoom();
+    const nextRoom = stagedTransition.room;
+    const nextRoomWorldMatrix = nextRoom.getVisualRoot().matrixWorld.clone();
+
     this.storyDirector.leaveRoom();
     this.roomCompleteBanner.reset();
-    this.roomAudioDirector.finishRoom();
     this.housePressureLighting.release();
-    this.blackoutView.begin(previousRoom.getVisualRoot(), this.scene);
-    this.blackoutView.apply({
-      stage: 'full-black',
-      elapsedMs: 0,
-      overlayOpacity: 1,
-      lightMultiplier: 0,
-      anomalyApplicationDue: false,
-      complete: false,
-    });
     this.debugRuntime?.dispose();
     this.debugRuntime = null;
     this.targetReportHighlight.reset();
-    this.anomalySystem.restore();
 
-    try {
-      nextRoom = await this.roomPreloader.consume(nextRoomIndex, {
-        scene: this.scene,
-        worldCollision: this.worldCollision,
-      });
-
-      if (nextRoom === null) {
-        nextRoom = this.createRoom(nextRoomIndex);
-        nextRoom.mount({
-          scene: this.scene,
-          worldCollision: this.worldCollision,
-        });
-        await nextRoom.loadAssets(this.assetManager);
-      }
-    } catch (error: unknown) {
-      console.error('The next room could not be loaded.', error);
-      nextRoom?.unmount();
-      previousRoom.unmount();
-      previousRoom.mount({
-        scene: this.scene,
-        worldCollision: this.worldCollision,
-      });
-      await previousRoom.loadAssets(this.assetManager);
-      this.configureRoomGameplaySystems(previousRoom);
-      this.registerActiveRoomCatalog();
-      this.prepareActiveRoomBaseline(runIdentity.seed);
-      this.finishRoomTransition();
-      return;
-    }
-
-    if (nextRoom === null) {
+    if (
+      stagedTransition.roomIndex !== nextRoomIndex ||
+      !nextRoom.isMounted()
+    ) {
       throw new Error(
-        `Room ${nextRoomIndex + 1} was neither preloaded nor loaded during transition.`,
+        `Room ${nextRoomIndex + 1} was not staged for its seamless transition.`,
       );
     }
 
-    previousRoom.unmount();
+    this.playerController.rebaseToRoom(
+      nextRoomWorldMatrix,
+      stagedTransition.placement.rotationY,
+    );
+    this.retireRoom(previousRoom);
+    restoreRoomEntranceDoor(stagedTransition.prepared.entrance);
+    resetRoomPlacement(nextRoom);
+    this.worldCollision.adoptFrom(
+      stagedTransition.prepared.activeCollision,
+      nextRoom.getCollisionRoot(),
+    );
+    stagedTransition.prepared.collisionTarget.world =
+      this.worldCollision;
     this.room = nextRoom;
+    this.stagedRoomTransition = null;
     const advancedStep = this.roomProgression.advance();
 
     if (
@@ -862,29 +945,333 @@ export class GameApp {
       );
     }
 
-    this.configureRoomGameplaySystems(nextRoom);
-    this.registerActiveRoomCatalog();
-    this.prepareActiveRoomBaseline(runIdentity.seed);
+    this.configureRoomGameplaySystems(
+      nextRoom,
+      stagedTransition.prepared.anomalySystem,
+    );
+    this.prepareActiveRoomBaseline(runIdentity.seed, true);
     this.finishRoomTransition();
   }
 
-  private prepareActiveRoomBaseline(runSeed: number): void {
+  private prepareSeamlessNextRoom(): Promise<StagedRoomTransition> {
+    const nextRoomIndex = this.roomProgression.currentStep.roomIndex + 1;
+
+    if (
+      this.stagedRoomTransition?.roomIndex === nextRoomIndex &&
+      this.stagedRoomTransition.room.isMounted()
+    ) {
+      this.prepareTransitionBaselineForCurrentRun(
+        this.stagedRoomTransition.room,
+        nextRoomIndex,
+        this.stagedRoomTransition.prepared,
+      );
+      return Promise.resolve(this.stagedRoomTransition);
+    }
+
+    if (this.seamlessRoomStagePromise !== null) {
+      return this.seamlessRoomStagePromise;
+    }
+
+    if (!this.canAdvanceToNextRoom()) {
+      return Promise.reject(
+        new Error('The current room has no seamless successor.'),
+      );
+    }
+
+    const previousRoom = this.room;
+    const exitDoorway = resolveExitDoorway(previousRoom);
+    const stageVersion = this.seamlessRoomStageVersion;
+    let nextRoom: PlayableRoom | null = null;
+    const assertStageIsCurrent = (): void => {
+      if (
+        this.destroyed ||
+        stageVersion !== this.seamlessRoomStageVersion ||
+        this.room !== previousRoom
+      ) {
+        throw new Error('The seamless room staging request was cancelled.');
+      }
+    };
+    const preparation = (async (): Promise<StagedRoomTransition> => {
+      try {
+        nextRoom = await this.roomPreloader.consume(nextRoomIndex, {
+          scene: this.scene,
+          worldCollision: this.worldCollision,
+          activateCollision: false,
+        });
+        assertStageIsCurrent();
+
+        if (nextRoom === null) {
+          nextRoom = this.createRoom(nextRoomIndex);
+          nextRoom.mount({
+            scene: new THREE.Scene(),
+            worldCollision: new WorldCollision(),
+          });
+          await nextRoom.loadAssets(this.assetManager);
+          await this.preparePreloadedRoom(nextRoom, nextRoomIndex);
+          assertStageIsCurrent();
+          nextRoom.transferMount({
+            scene: this.scene,
+            worldCollision: this.worldCollision,
+            activateCollision: false,
+          });
+        }
+
+        assertStageIsCurrent();
+        const prepared = this.preparedRoomTransitions.get(nextRoom);
+
+        if (prepared === undefined) {
+          throw new Error(
+            `Room ${nextRoomIndex + 1} was loaded without transition preparation.`,
+          );
+        }
+
+        this.prepareTransitionBaselineForCurrentRun(
+          nextRoom,
+          nextRoomIndex,
+          prepared,
+        );
+        const placement = placeRoomEntranceAtExit(
+          nextRoom,
+          exitDoorway,
+          prepared.entrance.doorway,
+        );
+        const stagedTransition = {
+          roomIndex: nextRoomIndex,
+          room: nextRoom,
+          placement,
+          prepared,
+        } satisfies StagedRoomTransition;
+        this.stagedRoomTransition = stagedTransition;
+        this.rendererManager.invalidateShadows();
+        return stagedTransition;
+      } catch (error: unknown) {
+        nextRoom?.unmount();
+
+        if (previousRoom.isMounted() && this.room === previousRoom) {
+          this.worldCollision.buildFromObject(
+            previousRoom.getCollisionRoot(),
+          );
+        }
+
+        throw error;
+      }
+    })();
+
+    this.seamlessRoomStagePromise = preparation;
+    const clearPreparation = (): void => {
+      if (this.seamlessRoomStagePromise === preparation) {
+        this.seamlessRoomStagePromise = null;
+      }
+    };
+    void preparation.then(clearPreparation, clearPreparation);
+    return preparation;
+  }
+
+  private cancelSeamlessRoomStage(): void {
+    this.seamlessRoomStageVersion += 1;
+    this.exitStageRequested = false;
+    const stagedRoom = this.stagedRoomTransition?.room;
+    this.stagedRoomTransition = null;
+    this.seamlessRoomStagePromise = null;
+
+    if (stagedRoom !== undefined && stagedRoom !== this.room) {
+      stagedRoom.unmount();
+    }
+
+    if (this.room.isMounted()) {
+      this.worldCollision.buildFromObject(this.room.getCollisionRoot());
+    }
+  }
+
+  private async preparePreloadedRoom(
+    room: PlayableRoom,
+    _roomIndex: number,
+  ): Promise<void> {
+    if (this.preparedRoomTransitions.has(room)) {
+      return;
+    }
+
+    await yieldToMainThread();
+
+    if (this.destroyed || !room.isMounted()) {
+      throw new Error('The room changed before preparation could start.');
+    }
+
+    const activeCollision = new WorldCollision();
+    const collisionTarget = { world: activeCollision };
+    const anomalySystem = new RoomAnomalySystem(
+      room.getAnomalyTargetRegistry(),
+      () => {
+        collisionTarget.world.buildFromObject(room.getCollisionRoot());
+      },
+    );
+    this.registerRoomCatalog(room, anomalySystem);
+    const entranceDoorway = resolveEntranceDoorway(room);
+
+    await yieldToMainThread();
+
+    if (this.destroyed || !room.isMounted()) {
+      throw new Error('The room changed during collision preparation.');
+    }
+
+    if (!activeCollision.isReady()) {
+      activeCollision.buildFromObject(room.getCollisionRoot());
+    }
+    const openExitCollision = this.prepareOpenExitCollision(room);
+    const entrance = openRoomEntranceDoor(room, entranceDoorway);
+    await this.rendererManager.prepareObject(
+      room.getVisualRoot(),
+      this.cameraManager.camera,
+      this.scene,
+    );
+
+    if (this.destroyed || !room.isMounted()) {
+      throw new Error('The room changed during shader preparation.');
+    }
+
+    this.preparedRoomTransitions.set(room, {
+      anomalySystem,
+      entrance,
+      activeCollision,
+      openExitCollision,
+      collisionTarget,
+      preparedRunKey: null,
+    });
+  }
+
+  private prepareTransitionBaselineForCurrentRun(
+    room: PlayableRoom,
+    roomIndex: number,
+    prepared: PreparedRoomTransition,
+  ): void {
+    const runIdentity = this.runIdentity;
+
+    if (runIdentity === null) {
+      return;
+    }
+
+    const runKey = `${runIdentity.mode}:${runIdentity.seed}`;
+
+    if (prepared.preparedRunKey === runKey) {
+      return;
+    }
+
+    const stagedPlacement =
+      this.stagedRoomTransition?.room === room
+        ? this.stagedRoomTransition.placement
+        : null;
+
+    if (stagedPlacement !== null) {
+      resetRoomPlacement(room);
+    }
+
+    try {
+      restoreRoomEntranceDoor(prepared.entrance);
+      this.prepareAnomalyBaselineFor(
+        room,
+        prepared.anomalySystem,
+        roomIndex,
+        runIdentity.seed,
+      );
+      prepared.activeCollision.buildFromObject(room.getCollisionRoot());
+      this.prepareOpenExitCollision(
+        room,
+        prepared.openExitCollision,
+      );
+      prepared.entrance = openRoomEntranceDoor(
+        room,
+        prepared.entrance.doorway,
+      );
+      prepared.preparedRunKey = runKey;
+    } finally {
+      if (stagedPlacement !== null) {
+        applyRoomPlacement(room, stagedPlacement);
+      }
+    }
+  }
+
+  private prepareOpenExitCollision(
+    room: PlayableRoom,
+    target = new WorldCollision(),
+  ): WorldCollision {
+    room.setExitDoorCollisionEnabled(false, false);
+
+    try {
+      target.buildFromObject(room.getCollisionRoot());
+    } finally {
+      room.setExitDoorCollisionEnabled(true, false);
+    }
+
+    this.openExitCollisions.set(room, target);
+    return target;
+  }
+
+  private setRoomExitDoorCollisionEnabled(
+    room: PlayableRoom,
+    enabled: boolean,
+  ): void {
+    if (enabled) {
+      room.setExitDoorCollisionEnabled(true);
+      return;
+    }
+
+    const openExitCollision = this.openExitCollisions.get(room);
+
+    if (openExitCollision?.isReady() !== true) {
+      room.setExitDoorCollisionEnabled(false);
+      return;
+    }
+
+    room.setExitDoorCollisionEnabled(false, false);
+    this.worldCollision.adoptFrom(
+      openExitCollision,
+      room.getCollisionRoot(),
+    );
+  }
+
+  private retireRoom(room: PlayableRoom): void {
+    room.getVisualRoot().visible = false;
+    room.getCollisionRoot().visible = false;
+    this.retiredRooms.add(room);
+  }
+
+  private disposeRetiredRooms(): void {
+    for (const room of this.retiredRooms) {
+      room.unmount();
+    }
+
+    this.retiredRooms.clear();
+  }
+
+  private prepareActiveRoomBaseline(
+    runSeed: number,
+    baselineAlreadyPrepared = false,
+  ): void {
+    this.exitUnlockPending = false;
+    this.exitStageRequested = false;
     this.reportSystem.reset();
     this.pendingAnomalyPlan = null;
     this.anomalyAppliedDuringBlackout = false;
     this.exitDoorController.reset();
-    this.prepareAnomalyBaseline(runSeed);
+
+    if (!baselineAlreadyPrepared) {
+      this.prepareAnomalyBaseline(runSeed);
+    }
+
     this.rendererManager.invalidateShadows();
   }
 
   private finishRoomTransition(): void {
     this.housePressureLighting.bind(this.room.getVisualRoot(), this.scene);
     this.applyHousePressure(this.housePressureSystem.getSnapshot());
-    this.resetPlayer();
+    this.aimedTargetId = null;
+    this.aimedStoryInteraction = null;
+    this.lastSelectedTargetId = null;
     this.blackoutView.reset();
     this.roomAudioDirector.startRoom();
-    this.debugRuntime = this.createDebugRuntime();
-    this.preloadNextBuiltRoom();
+    if (this.debugVisible) {
+      this.debugRuntime = this.createDebugRuntime();
+    }
     this.storyDirector.enterRoom(this.room.definition.id);
     this.gameStateMachine.transitionTo('room-intro');
 
@@ -941,7 +1328,7 @@ export class GameApp {
   }
 
   private isRoomBuilt(roomIndex: number): boolean {
-    return roomIndex >= 0 && roomIndex <= 9;
+    return roomIndex >= 0 && roomIndex < ROOM_COUNT;
   }
 
   private canAdvanceToNextRoom(): boolean {
@@ -958,15 +1345,74 @@ export class GameApp {
     );
   }
 
-  private preloadNextBuiltRoom(): void {
-    const nextRoomIndex =
-      this.roomProgression.currentStep.roomIndex + 1;
+  private async preloadAllFutureRooms(
+    onRoomPrepared: (roomIndex: number) => void = () => undefined,
+  ): Promise<void> {
+    for (let roomIndex = 1; roomIndex < ROOM_COUNT; roomIndex += 1) {
+      if (this.stagedRoomTransition?.roomIndex === roomIndex) {
+        onRoomPrepared(roomIndex);
+        continue;
+      }
 
-    if (!this.canAdvanceToNextRoom()) {
-      return;
+      const roomReady = await this.roomPreloader.preloadRoom(roomIndex);
+
+      if (!roomReady) {
+        throw new Error(
+          `Room ${roomIndex + 1} could not be prepared before gameplay.`,
+        );
+      }
+
+      onRoomPrepared(roomIndex);
+      await yieldToMainThread();
     }
+  }
 
-    void this.roomPreloader.preloadRoom(nextRoomIndex);
+  private preloadUpcomingRooms(): void {
+    const firstRoomIndex =
+      this.roomProgression.currentStep.roomIndex + 1;
+    const roomIndices = Array.from(
+      { length: PRELOAD_ROOM_LOOKAHEAD },
+      (_, offset) => firstRoomIndex + offset,
+    ).filter(
+      (roomIndex) =>
+        this.isRoomBuilt(roomIndex) &&
+        this.stagedRoomTransition?.roomIndex !== roomIndex,
+    );
+    const preloadVersion = ++this.roomPreloadWindowVersion;
+
+    void (async () => {
+      for (const roomIndex of roomIndices) {
+        await waitForIdleWork();
+
+        if (
+          this.destroyed ||
+          preloadVersion !== this.roomPreloadWindowVersion
+        ) {
+          return;
+        }
+
+        const roomReady = await this.roomPreloader.preloadRoom(roomIndex);
+
+        if (
+          roomReady &&
+          roomIndex === firstRoomIndex &&
+          preloadVersion === this.roomPreloadWindowVersion
+        ) {
+          await waitForIdleWork();
+
+          if (
+            this.destroyed ||
+            preloadVersion !== this.roomPreloadWindowVersion
+          ) {
+            return;
+          }
+
+          await this.prepareSeamlessNextRoom();
+        }
+      }
+    })().catch((error: unknown) => {
+      console.warn('The upcoming room window could not be preloaded.', error);
+    });
   }
 
   private createDebugRuntime(): GreyboxDebugRuntime | null {
@@ -1048,6 +1494,7 @@ export class GameApp {
   }
 
   private async performLevelBuilderRoomChange(roomIndex: number): Promise<void> {
+    this.cancelSeamlessRoomStage();
     const previousRoom = this.room;
     const nextRoom = this.createRoom(roomIndex);
     nextRoom.mount({
@@ -1067,6 +1514,7 @@ export class GameApp {
       return;
     }
 
+    this.roomPreloadWindowVersion += 1;
     this.roomPreloader.cancel();
     nextRoom.transferMount({
       scene: this.scene,
@@ -1104,16 +1552,24 @@ export class GameApp {
       this.storyDirector.enterRoom(nextRoom.definition.id);
     }
 
-    this.debugRuntime = this.createDebugRuntime();
+    if (this.debugVisible) {
+      this.debugRuntime = this.createDebugRuntime();
+    }
     this.debugRuntime?.openLevelBuilder();
   }
 
   private handleDebugVisibilityInput(): void {
-    if (
-      !this.inputManager.wasActionPressed('toggle-debug') ||
-      this.debugRuntime === null ||
-      this.debugRuntime.isLevelBuilderOpen()
-    ) {
+    if (!this.inputManager.wasActionPressed('toggle-debug')) {
+      return;
+    }
+
+    if (this.debugRuntime === null) {
+      this.debugVisible = true;
+      this.debugRuntime = this.createDebugRuntime();
+      return;
+    }
+
+    if (this.debugRuntime.isLevelBuilderOpen()) {
       return;
     }
 
@@ -1232,6 +1688,7 @@ export class GameApp {
     const requirement = this.getPendingStoryExitRequirement();
 
     if (requirement !== null) {
+      this.exitUnlockPending = false;
       this.roomCompleteBanner.show({
         instruction:
           requirement.exitInstruction ?? 'COMPLETE THE MEMORY',
@@ -1240,13 +1697,66 @@ export class GameApp {
       return false;
     }
 
+    this.roomCompleteBanner.reset();
+    this.exitUnlockPending = true;
+    this.ensureNextRoomStagedForExit();
+    this.releasePendingExitUnlock();
+    return this.exitDoorController.getSnapshot().state !== 'locked';
+  }
+
+  private releasePendingExitUnlock(): void {
+    if (
+      !this.exitUnlockPending ||
+      this.storyEffectRuntime.isRoomExitHeld()
+    ) {
+      return;
+    }
+
+    if (
+      this.canAdvanceToNextRoom() &&
+      !this.isImmediateSuccessorStaged()
+    ) {
+      this.ensureNextRoomStagedForExit();
+      return;
+    }
+
+    this.exitUnlockPending = false;
     this.roomCompleteBanner.show();
 
     if (this.exitDoorController.unlock()) {
       this.roomAudioDirector.openExitDoor();
     }
+  }
 
-    return true;
+  private ensureNextRoomStagedForExit(): void {
+    if (
+      !this.canAdvanceToNextRoom() ||
+      this.isImmediateSuccessorStaged() ||
+      this.exitStageRequested
+    ) {
+      return;
+    }
+
+    this.exitStageRequested = true;
+    void this.prepareSeamlessNextRoom()
+      .then(() => {
+        this.exitStageRequested = false;
+        this.releasePendingExitUnlock();
+      })
+      .catch((error: unknown) => {
+        console.warn('The next room could not be staged seamlessly.', error);
+      });
+  }
+
+  private isImmediateSuccessorStaged(): boolean {
+    const stagedTransition = this.stagedRoomTransition;
+
+    return (
+      stagedTransition !== null &&
+      stagedTransition.roomIndex ===
+        this.roomProgression.currentStep.roomIndex + 1 &&
+      stagedTransition.room.isMounted()
+    );
   }
 
   private getPendingStoryExitRequirement(): StoryInteractionDefinition | null {
@@ -1304,6 +1814,18 @@ export class GameApp {
   }
 
   private prepareNewRun(mode: GameMode): void {
+    const preservePreparedSuccessor =
+      this.room.definition.id === 'greybox-bedroom' &&
+      this.stagedRoomTransition?.roomIndex === 1 &&
+      this.stagedRoomTransition.room.isMounted();
+
+    if (!preservePreparedSuccessor) {
+      this.cancelSeamlessRoomStage();
+      this.roomPreloader.cancel();
+    }
+
+    this.roomPreloadWindowVersion += 1;
+    this.disposeRetiredRooms();
     this.roomProgression.reset();
 
     if (this.room.definition.id !== this.roomProgression.currentStep.id) {
@@ -1327,6 +1849,9 @@ export class GameApp {
     this.targetReportHighlight.reset();
     this.gameOverRevealTarget = null;
     this.exitDoorController.reset();
+    if (this.openExitCollisions.get(this.room)?.isReady() !== true) {
+      this.prepareOpenExitCollision(this.room);
+    }
     this.anomalySystem.restore();
     this.rendererManager.invalidateShadows();
     this.runTimer.reset();
@@ -1335,6 +1860,8 @@ export class GameApp {
     this.rewardedReviveUsed = false;
     this.gameOverFadeElapsedMs = null;
     this.failedOutcomeRecordedForRun = false;
+    this.exitUnlockPending = false;
+    this.exitStageRequested = false;
     const identityOptions =
       this.nextRunSeedOverride === null
         ? { mode }
@@ -1342,7 +1869,13 @@ export class GameApp {
     this.runIdentity = createRunIdentity(identityOptions);
     this.storyDirector.beginLoop(mode, this.room.definition.id);
     this.prepareAnomalyBaseline(this.runIdentity.seed);
-    this.preloadNextBuiltRoom();
+    if (this.stagedRoomTransition !== null) {
+      this.prepareTransitionBaselineForCurrentRun(
+        this.stagedRoomTransition.room,
+        this.stagedRoomTransition.roomIndex,
+        this.stagedRoomTransition.prepared,
+      );
+    }
     this.rendererManager.invalidateShadows();
     this.applyHousePressure(this.housePressureSystem.getSnapshot());
   }
@@ -1500,20 +2033,28 @@ export class GameApp {
     this.gameStateMachine.transitionTo('room-intro');
     this.resetPlayer();
     this.rendererManager.resize();
+    this.render();
     this.setGameplayActive(true);
     await Promise.all([this.unlockAudio(), this.requestPointerLock()]);
   }
 
   private async ensureFirstRoomMounted(): Promise<void> {
     if (this.room.definition.id === 'greybox-bedroom') {
+      this.roomProgression.reset();
+      await this.preloadAllFutureRooms();
+      await this.ensureFirstSuccessorStaged();
       return;
     }
 
+    this.cancelSeamlessRoomStage();
+    this.roomPreloadWindowVersion += 1;
     this.roomPreloader.cancel();
     this.debugRuntime?.dispose();
     this.debugRuntime = null;
     this.anomalySystem.restore();
     this.room.unmount();
+    this.disposeRetiredRooms();
+    this.roomProgression.reset();
     const firstRoom = new GreyboxBedroom();
     firstRoom.mount({
       scene: this.scene,
@@ -1523,8 +2064,30 @@ export class GameApp {
     this.room = firstRoom;
     this.configureRoomGameplaySystems(firstRoom);
     this.registerActiveRoomCatalog();
-    this.debugRuntime = this.createDebugRuntime();
+    this.prepareOpenExitCollision(firstRoom);
+    if (this.debugVisible) {
+      this.debugRuntime = this.createDebugRuntime();
+    }
     this.rendererManager.invalidateShadows();
+    await this.preloadAllFutureRooms();
+    await this.ensureFirstSuccessorStaged();
+  }
+
+  private async ensureFirstSuccessorStaged(): Promise<void> {
+    if (this.isImmediateSuccessorStaged()) {
+      return;
+    }
+
+    const secondRoomReady = await this.roomPreloader.preloadRoom(1);
+
+    if (!secondRoomReady) {
+      throw new Error('The second room could not be prepared.');
+    }
+
+    await this.prepareSeamlessNextRoom();
+    this.rendererManager.invalidateShadows();
+    this.render();
+    await yieldToMainThread();
   }
 
   private beginBlackout(): void {
@@ -1537,6 +2100,7 @@ export class GameApp {
     this.pendingAnomalyPlan = this.generateAnomalyPlan(runIdentity.seed);
     this.anomalyAppliedDuringBlackout = false;
     this.gameStateMachine.transitionTo('blackout');
+    this.preloadUpcomingRooms();
   }
 
   private generateAnomalyPlan(runSeed: number): AnomalyPlan {
@@ -1600,14 +2164,28 @@ export class GameApp {
   }
 
   private prepareAnomalyBaseline(runSeed: number): void {
-    const requiredVisibleTargetIds =
-      this.getStoryRequiredVisibleTargetIds();
-    const disappearanceProtectedTargetIds =
-      this.getStoryDisappearanceProtectedTargetIds();
-    this.anomalySystem.prepareRunBaseline({
+    this.prepareAnomalyBaselineFor(
+      this.room,
+      this.anomalySystem,
+      this.roomProgression.currentStep.roomIndex,
       runSeed,
-      roomIndex: this.roomProgression.currentStep.roomIndex,
-      roomId: this.roomProgression.currentStep.id,
+    );
+  }
+
+  private prepareAnomalyBaselineFor(
+    room: PlayableRoom,
+    anomalySystem: RoomAnomalySystem,
+    roomIndex: number,
+    runSeed: number,
+  ): void {
+    const requiredVisibleTargetIds =
+      this.getStoryRequiredVisibleTargetIds(room);
+    const disappearanceProtectedTargetIds =
+      this.getStoryDisappearanceProtectedTargetIds(room);
+    anomalySystem.prepareRunBaseline({
+      runSeed,
+      roomIndex,
+      roomId: room.definition.id,
       ...(requiredVisibleTargetIds.length === 0
         ? {}
         : { requiredVisibleTargetIds }),
@@ -1617,20 +2195,24 @@ export class GameApp {
     });
   }
 
-  private getStoryRequiredVisibleTargetIds(): readonly string[] {
+  private getStoryRequiredVisibleTargetIds(
+    room: PlayableRoom,
+  ): readonly string[] {
     if (this.runIdentity?.mode !== 'story') {
       return [];
     }
 
-    return this.room.getAnomalyTargets().map(({ id }) => id);
+    return room.getAnomalyTargets().map(({ id }) => id);
   }
 
-  private getStoryDisappearanceProtectedTargetIds(): readonly string[] {
+  private getStoryDisappearanceProtectedTargetIds(
+    room: PlayableRoom,
+  ): readonly string[] {
     if (this.runIdentity?.mode !== 'story') {
       return [];
     }
 
-    const roomId = this.room.definition.id;
+    const roomId = room.definition.id;
     const authoredTargetIds = STORY_DISAPPEARANCE_PROTECTED_TARGET_IDS_BY_ROOM[
       roomId as keyof typeof STORY_DISAPPEARANCE_PROTECTED_TARGET_IDS_BY_ROOM
     ] ?? [];
@@ -1789,8 +2371,38 @@ export class GameApp {
     this.audioManager.setCategoryVolume('interface', settings.effectsVolume);
   }
 
+  private scheduleStoryProgressCommit(
+    progress: PersistentStoryProgressSnapshot,
+  ): void {
+    this.pendingStoryProgress = progress;
+
+    if (this.storyProgressCommitScheduled) {
+      return;
+    }
+
+    this.storyProgressCommitScheduled = true;
+    scheduleIdleWork(() => this.commitPendingStoryProgress(), 500);
+  }
+
+  private commitPendingStoryProgress(): void {
+    this.storyProgressCommitScheduled = false;
+    const progress = this.pendingStoryProgress;
+    this.pendingStoryProgress = null;
+
+    if (progress === null) {
+      return;
+    }
+
+    this.storySaveRepository.saveProgress(progress);
+
+    if (!this.destroyed) {
+      this.storyNotebookScreen.refresh(progress);
+    }
+  }
+
   private readonly handleEraseStoryProgress = (): void => {
     const emptyProgress = createEmptyStoryProgress();
+    this.pendingStoryProgress = null;
     this.storySaveRepository.eraseProgressPreservingAccess();
     this.storyProgress.hydrate(emptyProgress);
     this.storyNotebookScreen.refresh(emptyProgress);
@@ -2112,4 +2724,46 @@ function createApplicationFrameSnapshot(
     lightMultiplier: 0,
     complete: false,
   };
+}
+
+function waitForIdleWork(): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof window.requestIdleCallback === 'function') {
+      window.requestIdleCallback(() => resolve(), { timeout: 1_200 });
+      return;
+    }
+
+    window.setTimeout(resolve, 16);
+  });
+}
+
+function scheduleIdleWork(
+  work: () => void,
+  timeoutMs = 2_000,
+): void {
+  if (typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(() => work(), { timeout: timeoutMs });
+    return;
+  }
+
+  window.setTimeout(work, 250);
+}
+
+async function yieldToMainThread(): Promise<void> {
+  const scheduler = (
+    globalThis as {
+      readonly scheduler?: {
+        readonly yield?: () => Promise<void>;
+      };
+    }
+  ).scheduler;
+
+  if (scheduler?.yield !== undefined) {
+    await scheduler.yield();
+    return;
+  }
+
+  await new Promise<void>((resolve) => {
+    window.setTimeout(resolve, 0);
+  });
 }

@@ -90,6 +90,32 @@
             </button>
           </div>
 
+          <div
+            id="start-loader"
+            class="start-screen__loader"
+            role="status"
+            aria-live="polite"
+          >
+            <div class="start-screen__loader-copy">
+              <span id="start-loader-label">INITIALIZING</span>
+              <span id="start-loader-value">0%</span>
+            </div>
+            <div
+              id="start-loader-track"
+              class="start-screen__loader-track"
+              role="progressbar"
+              aria-label="Loading all rooms"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              aria-valuenow="0"
+            >
+              <span
+                id="start-loader-bar"
+                class="start-screen__loader-bar"
+              ></span>
+            </div>
+          </div>
+
           <div class="start-screen__controls" aria-label="Game controls">
             <span class="desktop-only">WASD / MOVE</span>
             <span class="desktop-only">MOUSE / LOOK</span>

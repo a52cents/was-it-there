@@ -140,6 +140,35 @@ describe('RoomPreloader', () => {
     expect(onError).not.toHaveBeenCalled();
   });
 
+  it('keeps a prepared three-room lookahead window', async () => {
+    const prepareRoom = vi.fn(() => Promise.resolve());
+    const preloader = new RoomPreloader(
+      {} as AssetManager,
+      () => new PreloadTestRoom(),
+      () => undefined,
+      prepareRoom,
+    );
+
+    await Promise.all([
+      preloader.preloadRoom(1),
+      preloader.preloadRoom(2),
+      preloader.preloadRoom(3),
+    ]);
+
+    expect(preloader.getPendingRoomIndices()).toEqual([1, 2, 3]);
+    expect(prepareRoom).toHaveBeenCalledTimes(3);
+
+    const room = await preloader.consume(1, {
+      scene: new THREE.Scene(),
+      worldCollision: new WorldCollision(),
+    });
+
+    expect(room).not.toBeNull();
+    expect(preloader.getPendingRoomIndices()).toEqual([2, 3]);
+    room?.unmount();
+    preloader.dispose();
+  });
+
   it('keeps asset leases through transfer and releases them with the consumed room', async () => {
     const source = new THREE.Group();
     source.add(

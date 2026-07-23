@@ -174,4 +174,21 @@ describe('GreyboxBedroom player integration', () => {
     expect(room.getCollisionObjectCount()).toBe(closedCollisionCount);
     room.unmount();
   });
+
+  it('can detach the door collider without rebuilding the active octree', () => {
+    const scene = new THREE.Scene();
+    const world = new WorldCollision();
+    const room = new GreyboxBedroom();
+    room.mount({ scene, worldCollision: world });
+    const closedTriangleCount = world.getTriangleCount();
+
+    room.setExitDoorCollisionEnabled(false, false);
+
+    expect(room.isExitDoorCollisionEnabled()).toBe(false);
+    expect(world.getTriangleCount()).toBe(closedTriangleCount);
+    expect(world.getSourceRoot()).toBe(room.getCollisionRoot());
+
+    room.setExitDoorCollisionEnabled(true, false);
+    room.unmount();
+  });
 });

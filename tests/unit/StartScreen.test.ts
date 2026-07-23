@@ -25,6 +25,7 @@ class FakeElement {
   public hidden = false;
   public textContent: string | null = null;
   public readonly dataset: Record<string, string> = {};
+  public readonly style: Record<string, string> = {};
   public readonly classList = new FakeClassList();
   private readonly attributes = new Map<string, string>();
 
@@ -69,6 +70,11 @@ function createStartScreen(): {
   readonly escape: FakeButton;
   readonly notebook: FakeButton;
   readonly escapeDescription: FakeElement;
+  readonly loader: FakeElement;
+  readonly loaderLabel: FakeElement;
+  readonly loaderValue: FakeElement;
+  readonly loaderTrack: FakeElement;
+  readonly loaderBar: FakeElement;
 } {
   const root = new FakeElement();
   const title = new FakeElement();
@@ -77,6 +83,11 @@ function createStartScreen(): {
   const escape = new FakeButton();
   const notebook = new FakeButton();
   const escapeDescription = new FakeElement();
+  const loader = new FakeElement();
+  const loaderLabel = new FakeElement();
+  const loaderValue = new FakeElement();
+  const loaderTrack = new FakeElement();
+  const loaderBar = new FakeElement();
   const screen = new StartScreen(
     root as unknown as HTMLElement,
     title as unknown as HTMLHeadingElement,
@@ -85,6 +96,11 @@ function createStartScreen(): {
     escape as unknown as HTMLButtonElement,
     escapeDescription as unknown as HTMLElement,
     notebook as unknown as HTMLButtonElement,
+    loader as unknown as HTMLElement,
+    loaderLabel as unknown as HTMLElement,
+    loaderValue as unknown as HTMLElement,
+    loaderTrack as unknown as HTMLElement,
+    loaderBar as unknown as HTMLElement,
   );
 
   return {
@@ -96,6 +112,11 @@ function createStartScreen(): {
     escape,
     notebook,
     escapeDescription,
+    loader,
+    loaderLabel,
+    loaderValue,
+    loaderTrack,
+    loaderBar,
   };
 }
 
@@ -164,7 +185,8 @@ describe("StartScreen", () => {
   });
 
   it("disables mode selection and starting while loading", () => {
-    const { screen, play, story, escape, notebook } = createStartScreen();
+    const { screen, play, story, escape, notebook, loader } =
+      createStartScreen();
     const start = vi.fn();
     screen.onStart(start);
 
@@ -176,6 +198,28 @@ describe("StartScreen", () => {
     expect(story.disabled).toBe(true);
     expect(escape.disabled).toBe(true);
     expect(notebook.disabled).toBe(true);
+    expect(loader.hidden).toBe(false);
+  });
+
+  it("reports clamped room-loading progress and hides it when ready", () => {
+    const {
+      screen,
+      loader,
+      loaderLabel,
+      loaderValue,
+      loaderTrack,
+      loaderBar,
+    } = createStartScreen();
+
+    screen.setLoadingProgress(1.5, "2 ROOMS READY");
+
+    expect(loaderLabel.textContent).toBe("2 ROOMS READY");
+    expect(loaderValue.textContent).toBe("100%");
+    expect(loaderTrack.getAttribute("aria-valuenow")).toBe("100");
+    expect(loaderBar.style.transform).toBe("scaleX(1)");
+
+    screen.setBusy(false);
+    expect(loader.hidden).toBe(true);
   });
 
   it("opens the persistent Story notebook from the mode menu", () => {

@@ -60,6 +60,10 @@ export class StorySubtitleView {
     this.paused = false;
   }
 
+  public isVisible(): boolean {
+    return !this.element.hidden;
+  }
+
   public hide(): void {
     this.remainingMs = 0;
     this.element.hidden = true;

@@ -144,7 +144,10 @@ export abstract class FinalRouteRoomBase
     );
   }
 
-  public setExitDoorCollisionEnabled(enabled: boolean): void {
+  public setExitDoorCollisionEnabled(
+    enabled: boolean,
+    rebuildCollision = true,
+  ): void {
     const collider = this.exitDoorCollider;
     if (collider === null) {
       throw new Error(`${this.config.displayName} exit collider is unavailable.`);
@@ -158,7 +161,9 @@ export abstract class FinalRouteRoomBase
     } else {
       collider.removeFromParent();
     }
-    this.rebuildWorldCollision();
+    if (rebuildCollision) {
+      this.rebuildWorldCollision();
+    }
   }
 
   public setExitPortalProgress(progress: number): void {

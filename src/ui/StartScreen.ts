@@ -33,6 +33,11 @@ export class StartScreen {
     private readonly escapeModeButton: HTMLButtonElement,
     private readonly escapeModeDescription: HTMLElement,
     private readonly notebookButton: HTMLButtonElement,
+    private readonly loader: HTMLElement,
+    private readonly loaderLabel: HTMLElement,
+    private readonly loaderValue: HTMLElement,
+    private readonly loaderTrack: HTMLElement,
+    private readonly loaderBar: HTMLElement,
   ) {
     title.setAttribute("aria-label", START_SCREEN_COPY.title);
     this.playButton.textContent = START_SCREEN_COPY.loading;
@@ -40,6 +45,7 @@ export class StartScreen {
     this.storyModeButton.disabled = true;
     this.escapeModeButton.disabled = true;
     this.notebookButton.disabled = true;
+    this.loader.hidden = false;
     this.playButton.addEventListener("click", this.handlePlayClick);
     this.storyModeButton.addEventListener("click", this.handleStoryModeClick);
     this.escapeModeButton.addEventListener("click", this.handleEscapeModeClick);
@@ -66,6 +72,19 @@ export class StartScreen {
       : START_SCREEN_COPY.modes[this.selectedMode].play;
     this.playButton.setAttribute("aria-busy", String(busy));
     this.root.classList.toggle("is-loading", busy);
+    this.loader.hidden = !busy;
+  }
+
+  public setLoadingProgress(progress: number, label: string): void {
+    const normalizedProgress = Number.isFinite(progress)
+      ? Math.min(Math.max(progress, 0), 1)
+      : 0;
+    const percentage = Math.round(normalizedProgress * 100);
+
+    this.loaderLabel.textContent = label;
+    this.loaderValue.textContent = `${percentage}%`;
+    this.loaderTrack.setAttribute("aria-valuenow", String(percentage));
+    this.loaderBar.style.transform = `scaleX(${normalizedProgress})`;
   }
 
   public setEscapeUnlocked(unlocked: boolean): void {

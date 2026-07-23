@@ -340,7 +340,10 @@ export class GreyboxDiningRoom extends RoomRuntime implements PlayableRoom {
     }
   }
 
-  public setExitDoorCollisionEnabled(enabled: boolean): void {
+  public setExitDoorCollisionEnabled(
+    enabled: boolean,
+    rebuildCollision = true,
+  ): void {
     const collider = this.exitDoorCollider;
     if (collider === null) {
       throw new Error('The dining-room exit-door collider is unavailable.');
@@ -354,7 +357,9 @@ export class GreyboxDiningRoom extends RoomRuntime implements PlayableRoom {
     } else {
       collider.removeFromParent();
     }
-    this.rebuildWorldCollision();
+    if (rebuildCollision) {
+      this.rebuildWorldCollision();
+    }
   }
 
   public setExitPortalProgress(progress: number): void {

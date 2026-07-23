@@ -459,8 +459,12 @@ const SUPPLEMENTARY_ANOMALY_PLACEMENTS: readonly SupplementaryAnomalyPlacement[]
 ] as const;
 
 function createAutomaticAnomalyVariants(
-  _targetId: BedroomAnomalyTargetId,
+  targetId: BedroomAnomalyTargetId,
 ): readonly PreparedAnomalyVariant[] {
+  if (targetId === 'bookcase') {
+    return [];
+  }
+
   return [
     { id: 'hidden', kind: 'hide' },
     { id: 'appeared', kind: 'show' },
@@ -717,7 +721,10 @@ export class GreyboxBedroom extends RoomRuntime implements PlayableRoom {
     await this.loadHouseShellAssets(manager, 'bedroom');
   }
 
-  public setExitDoorCollisionEnabled(enabled: boolean): void {
+  public setExitDoorCollisionEnabled(
+    enabled: boolean,
+    rebuildCollision = true,
+  ): void {
     const collider = this.exitDoorCollider;
 
     if (collider === null) {
@@ -737,7 +744,9 @@ export class GreyboxBedroom extends RoomRuntime implements PlayableRoom {
       collider.removeFromParent();
     }
 
-    this.rebuildWorldCollision();
+    if (rebuildCollision) {
+      this.rebuildWorldCollision();
+    }
   }
 
   public isExitDoorCollisionEnabled(): boolean {

@@ -32,6 +32,7 @@ describe('StoryEffectRuntime', () => {
       pause: vi.fn(),
       resume: vi.fn(),
       reset: vi.fn(),
+      isVisible: vi.fn(() => false),
     };
     const memory = {
       show: vi.fn(),
@@ -39,6 +40,7 @@ describe('StoryEffectRuntime', () => {
       pause: vi.fn(),
       resume: vi.fn(),
       reset: vi.fn(),
+      isVisible: vi.fn(() => false),
     };
     const runtime = new StoryEffectRuntime(
       audio,
@@ -83,6 +85,7 @@ describe('StoryEffectRuntime', () => {
       pause: vi.fn(),
       resume: vi.fn(),
       reset: vi.fn(),
+      isVisible: vi.fn(() => false),
     };
     const memory = {
       show: vi.fn(),
@@ -90,6 +93,7 @@ describe('StoryEffectRuntime', () => {
       pause: vi.fn(),
       resume: vi.fn(),
       reset: vi.fn(),
+      isVisible: vi.fn(() => false),
     };
     const runtime = new StoryEffectRuntime(
       audio,
@@ -124,12 +128,43 @@ describe('StoryEffectRuntime', () => {
     expect(memory.reset).toHaveBeenCalledOnce();
   });
 
+  it('holds every room exit until both the caption and screen memory are hidden', () => {
+    const subtitle = {
+      update: vi.fn(),
+      isVisible: vi.fn(() => true),
+    };
+    const memory = {
+      update: vi.fn(),
+      isVisible: vi.fn(() => false),
+    };
+    const runtime = new StoryEffectRuntime(
+      { play: vi.fn(), stop: vi.fn() },
+      subtitle as unknown as StorySubtitleView,
+      memory as unknown as StoryMemoryView,
+    );
+
+    expect(runtime.isRoomExitHeld()).toBe(true);
+
+    subtitle.isVisible.mockReturnValue(false);
+    memory.isVisible.mockReturnValue(true);
+    expect(runtime.isRoomExitHeld()).toBe(true);
+
+    memory.isVisible.mockReturnValue(false);
+    expect(runtime.isRoomExitHeld()).toBe(false);
+  });
+
   it('applies and restores non-reportable room helpers', () => {
     const helperVisibility = vi.fn();
     const runtime = new StoryEffectRuntime(
       { play: vi.fn(), stop: vi.fn() },
-      { reset: vi.fn() } as unknown as StorySubtitleView,
-      { reset: vi.fn() } as unknown as StoryMemoryView,
+      {
+        reset: vi.fn(),
+        isVisible: vi.fn(() => false),
+      } as unknown as StorySubtitleView,
+      {
+        reset: vi.fn(),
+        isVisible: vi.fn(() => false),
+      } as unknown as StoryMemoryView,
       { onHelperVisibility: helperVisibility },
     );
 

@@ -109,6 +109,39 @@ export class PlayerController {
     this.synchronizeCamera();
   }
 
+  public rebaseToRoom(
+    roomWorldMatrix: THREE.Matrix4,
+    roomRotationY: number,
+  ): void {
+    const inverseRoomMatrix = roomWorldMatrix.clone().invert();
+    const inverseRoomRotation = new THREE.Quaternion().setFromAxisAngle(
+      new THREE.Vector3(0, 1, 0),
+      -roomRotationY,
+    );
+    const position = this.collider.getPosition()
+      .clone()
+      .applyMatrix4(inverseRoomMatrix);
+    const velocity = this.movement.getCurrentVelocity()
+      .clone()
+      .applyQuaternion(inverseRoomRotation);
+    const yaw = this.look.getYaw() - roomRotationY;
+    const pitch = this.look.getPitch();
+
+    this.collider.reset({
+      x: position.x,
+      y: position.y,
+      z: position.z,
+      yaw,
+      pitch,
+    });
+    this.respawnYaw = yaw;
+    this.respawnPitch = pitch;
+    this.look.reset(yaw, pitch);
+    this.movement.reset();
+    this.movement.restoreCurrentVelocity(velocity);
+    this.synchronizeCamera();
+  }
+
   public getPosition(): Readonly<THREE.Vector3> {
     return this.collider.getPosition();
   }

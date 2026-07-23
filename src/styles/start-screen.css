@@ -391,6 +391,42 @@
   opacity: 0.34;
 }
 
+.start-screen__loader {
+  width: 100%;
+  margin-top: 1.1rem;
+  color: rgb(238 233 223 / 56%);
+  font-family: var(--font-interface);
+  font-size: 0.56rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+}
+
+.start-screen__loader-copy {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.start-screen__loader-track {
+  width: 100%;
+  height: 2px;
+  margin-top: 0.55rem;
+  overflow: hidden;
+  background: rgb(238 233 223 / 13%);
+}
+
+.start-screen__loader-bar {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--memory-gold);
+  box-shadow: 0 0 0.65rem rgb(216 179 101 / 55%);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 180ms ease-out;
+}
+
 .start-screen__controls {
   display: flex;
   width: 100%;
@@ -541,6 +577,7 @@
   .start-screen__premise,
   .start-screen__modes,
   .start-screen__actions,
+  .start-screen__loader,
   .start-screen__controls {
     margin-top: 0.8rem;
   }
@@ -557,6 +594,10 @@
   .mode-option__number,
   #play-button,
   .start-screen__secondary-action {
+    transition: none;
+  }
+
+  .start-screen__loader-bar {
     transition: none;
   }
 

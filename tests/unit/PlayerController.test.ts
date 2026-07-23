@@ -149,6 +149,40 @@ describe('PlayerController', () => {
     expect(camera.position.y).toBeCloseTo(0.25 + PLAYER_CONFIG.eyeHeight);
   });
 
+  it('rebases position, view, and velocity into an adjacent room', () => {
+    const { controller, input } = createHarness();
+    controller.reset({ x: 3.4, y: 0, z: 1, yaw: -Math.PI / 2, pitch: 0.1 });
+    input.setActionPressed('move-forward', true);
+    controller.update(0.1);
+    const worldPosition = controller.getPosition().clone();
+    const worldVelocity = controller.getCurrentVelocity().clone();
+    const roomPosition = new THREE.Vector3(3, 0, 1);
+    const roomRotation = -Math.PI / 2;
+    const roomMatrix = new THREE.Matrix4().compose(
+      roomPosition,
+      new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(0, 1, 0),
+        roomRotation,
+      ),
+      new THREE.Vector3(1, 1, 1),
+    );
+    const expectedPosition = worldPosition
+      .clone()
+      .applyMatrix4(roomMatrix.clone().invert());
+    const expectedVelocity = worldVelocity
+      .clone()
+      .applyAxisAngle(new THREE.Vector3(0, 1, 0), -roomRotation);
+
+    controller.rebaseToRoom(roomMatrix, roomRotation);
+
+    expect(controller.getPosition().x).toBeCloseTo(expectedPosition.x);
+    expect(controller.getPosition().z).toBeCloseTo(expectedPosition.z);
+    expect(controller.getCurrentVelocity().x).toBeCloseTo(expectedVelocity.x);
+    expect(controller.getCurrentVelocity().z).toBeCloseTo(expectedVelocity.z);
+    expect(controller.getYaw()).toBeCloseTo(0);
+    expect(controller.getPitch()).toBeCloseTo(0.1);
+  });
+
   it('does not move or look while pointer lock is inactive', () => {
     const harness = createHarness();
     harness.setPointerLocked(false);

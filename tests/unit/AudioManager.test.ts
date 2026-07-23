@@ -314,6 +314,28 @@ describe('AudioManager', () => {
     expect(context.gains[0]?.gain.value).toBe(1);
   });
 
+  it('synthesizes stereo knocks, footsteps, and whispers as ambience', async () => {
+    const context = new FakeAudioContext();
+    const manager = new AudioManager(
+      () => context as unknown as AudioContext,
+    );
+    await manager.unlock();
+
+    manager.play('ambient-knock');
+    manager.play('ambient-footsteps');
+    manager.play('ambient-whisper');
+
+    expect(context.bufferSources).toHaveLength(3);
+    expect(
+      context.bufferSources.map((source) => source.buffer?.frameCount),
+    ).toEqual([74, 315, 285]);
+    expect(manager.getSnapshot().activeCueIds).toEqual([
+      'ambient-knock',
+      'ambient-footsteps',
+      'ambient-whisper',
+    ]);
+  });
+
   it('validates volumes and disposes the complete audio graph idempotently', async () => {
     const context = new FakeAudioContext();
     const manager = new AudioManager(

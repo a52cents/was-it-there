@@ -121,4 +121,43 @@ describe('WorldCollision', () => {
     expect(world.intersectCapsule(createCapsule(0.2, 0, 0))).toBeNull();
     expect(world.intersectCapsule(createCapsule(10.2, 0, 0))).not.toBeNull();
   });
+
+  it('keeps both adjacent rooms collidable during a seamless handoff', () => {
+    const world = new WorldCollision();
+    const firstRoom = createRoot({
+      size: [0.2, 3, 4],
+      position: [0, 1.5, 0],
+    });
+    const secondRoom = createRoot({
+      size: [0.2, 3, 4],
+      position: [10, 1.5, 0],
+    });
+
+    world.buildFromObjects([firstRoom, secondRoom]);
+
+    expect(world.getTriangleCount()).toBe(24);
+    expect(world.intersectCapsule(createCapsule(0.2, 0, 0))).not.toBeNull();
+    expect(world.intersectCapsule(createCapsule(10.2, 0, 0))).not.toBeNull();
+  });
+
+  it('adopts a prepared room octree without rebuilding it', () => {
+    const prepared = new WorldCollision();
+    const active = new WorldCollision();
+    const preparedRoot = createRoot({
+      size: [0.2, 3, 4],
+      position: [10, 1.5, 0],
+    });
+    prepared.buildFromObject(preparedRoot);
+    active.buildFromObject(
+      createRoot({ size: [0.2, 3, 4], position: [0, 1.5, 0] }),
+    );
+
+    active.adoptFrom(prepared, preparedRoot);
+
+    expect(active.getSourceRoot()).toBe(preparedRoot);
+    expect(active.getTriangleCount()).toBe(12);
+    expect(active.intersectCapsule(createCapsule(10.2, 0, 0))).not.toBeNull();
+    expect(active.intersectCapsule(createCapsule(0.2, 0, 0))).toBeNull();
+    expect(prepared.isReady()).toBe(false);
+  });
 });

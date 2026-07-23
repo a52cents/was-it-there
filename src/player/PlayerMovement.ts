@@ -72,6 +72,21 @@ export class PlayerMovement {
     return this.currentVelocity;
   }
 
+  public restoreCurrentVelocity(
+    velocity: Readonly<THREE.Vector3>,
+  ): void {
+    if (
+      !Number.isFinite(velocity.x) ||
+      !Number.isFinite(velocity.y) ||
+      !Number.isFinite(velocity.z)
+    ) {
+      return;
+    }
+
+    this.currentVelocity.copy(velocity);
+    this.previousVelocity.copy(velocity);
+  }
+
   public getTargetVelocity(): Readonly<THREE.Vector3> {
     return this.targetVelocity;
   }

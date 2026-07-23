@@ -131,7 +131,11 @@ export class StoryEffectRuntime {
   }
 
   public isRoomExitHeld(): boolean {
-    return this.roomExitHoldMs > 0;
+    return (
+      this.roomExitHoldMs > 0 ||
+      this.subtitleView.isVisible() ||
+      this.memoryView.isVisible()
+    );
   }
 }
 

@@ -217,13 +217,17 @@ describe('GreyboxBedroom final decor', () => {
         (variant) => variant.kind === 'color',
       );
 
-      expect(target.allowedKinds, target.id).toEqual([
-        'hide',
-        'show',
-        'color',
-      ]);
-      expect(hideVariants, target.id).toHaveLength(1);
-      expect(showVariants, target.id).toHaveLength(1);
+      expect(target.allowedKinds, target.id).toEqual(
+        target.id === 'bookcase'
+          ? ['color']
+          : ['hide', 'show', 'color'],
+      );
+      expect(hideVariants, target.id).toHaveLength(
+        target.id === 'bookcase' ? 0 : 1,
+      );
+      expect(showVariants, target.id).toHaveLength(
+        target.id === 'bookcase' ? 0 : 1,
+      );
       expect(moveVariants, target.id).toHaveLength(0);
       expect(colorVariants, target.id).toHaveLength(2);
       expect(rotateVariants, target.id).toHaveLength(0);
@@ -237,7 +241,7 @@ describe('GreyboxBedroom final decor', () => {
         (count, target) => count + target.variants.length,
         0,
       ),
-    ).toBe(56);
+    ).toBe(54);
 
     const plan = system.generatePlan({
       runSeed: 321,
@@ -338,10 +342,6 @@ describe('GreyboxBedroom final decor', () => {
         supportId: 'tv-cabinet',
         dependentIds: ['television'],
       },
-      {
-        supportId: 'bookcase',
-        dependentIds: ['radio', 'photo-frame'],
-      },
     ] as const;
 
     for (const relation of supportRelations) {
@@ -409,57 +409,43 @@ describe('GreyboxBedroom final decor', () => {
       throw new Error('Expected the complete bookcase support group.');
     }
 
-    let hiddenBookcaseSeed: number | null = null;
+    expect(bookcase.dependentTargetIds).toEqual(['radio', 'photo-frame']);
+    expect(bookcase.allowedKinds).toEqual(['color']);
+    expect(
+      bookcase.variants.map((variant) => ({
+        id: variant.id,
+        kind: variant.kind,
+        color: variant.kind === 'color' ? variant.color : null,
+      })),
+    ).toEqual([
+      { id: 'painted-blue', kind: 'color', color: '#536c7b' },
+      { id: 'painted-cream', kind: 'color', color: '#b5a38c' },
+    ]);
 
-    for (let seed = 0; seed < 2_000; seed += 1) {
+    for (let seed = 0; seed < 200; seed += 1) {
       const baseline = system.prepareRunBaseline({
         runSeed: seed,
         roomIndex: 0,
         roomId: room.definition.id,
       });
 
-      if (baseline.hiddenTargetIds.includes(bookcase.id)) {
-        hiddenBookcaseSeed = seed;
-        break;
-      }
+      expect(baseline.hiddenTargetIds).not.toContain(bookcase.id);
     }
 
-    expect(hiddenBookcaseSeed).not.toBeNull();
-    expectTargetVisualVisibility(radio, false);
-    expectTargetVisualVisibility(photoFrame, false);
-    expect(radio.interactionVolume.visible).toBe(false);
-    expect(photoFrame.interactionVolume.visible).toBe(false);
-
-    if (hiddenBookcaseSeed === null) {
-      throw new Error('Expected a seed with a hidden bookcase.');
-    }
-
-    const plan = system.generatePlan({
-      runSeed: hiddenBookcaseSeed,
-      roomIndex: 0,
-      roomId: room.definition.id,
-      difficulty: 1,
-      count: 1,
-    });
-    expect(plan.anomalies[0]?.targetId).not.toBe('radio');
-    expect(plan.anomalies[0]?.targetId).not.toBe('photo-frame');
-
-    const showVariant = bookcase.variants.find(
-      (variant) => variant.kind === 'show',
+    const bookcaseColorVariant = bookcase.variants.find(
+      (variant) => variant.kind === 'color',
     );
 
-    if (showVariant === undefined) {
-      throw new Error('Expected the bookcase show variant.');
+    if (bookcaseColorVariant === undefined) {
+      throw new Error('Expected a bookcase color variant.');
     }
 
-    system.applyPlan(createPlan(room, bookcase, showVariant));
+    system.applyPlan(createPlan(room, bookcase, bookcaseColorVariant));
     expectTargetVisualVisibility(bookcase, true);
     expectTargetVisualVisibility(radio, true);
     expectTargetVisualVisibility(photoFrame, true);
     expect(radio.interactionVolume.visible).toBe(true);
     expect(photoFrame.interactionVolume.visible).toBe(true);
-
-    let generatedProtectedFamilyDisappearance = false;
 
     for (let seed = 0; seed < 200; seed += 1) {
       const requiredBaseline = system.prepareRunBaseline({
@@ -481,14 +467,11 @@ describe('GreyboxBedroom final decor', () => {
       });
 
       for (const anomaly of planWithRequiredBaseline.anomalies) {
-        if (['bookcase', 'radio', 'photo-frame'].includes(anomaly.targetId)) {
-          generatedProtectedFamilyDisappearance ||=
-            anomaly.kind === 'hide';
+        if (anomaly.targetId === 'bookcase') {
+          expect(anomaly.kind).toBe('color');
         }
       }
     }
-
-    expect(generatedProtectedFamilyDisappearance).toBe(true);
 
     room.unmount();
     expect(manager.getCachedAssetCount()).toBe(0);

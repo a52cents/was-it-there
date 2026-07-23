@@ -1,4 +1,4 @@
-import type * as THREE from 'three';
+import * as THREE from 'three';
 import type { Capsule } from 'three/addons/math/Capsule.js';
 import { Octree } from 'three/addons/math/Octree.js';
 
@@ -22,6 +22,59 @@ export class WorldCollision {
     this.octree.fromGraphNode(root);
     this.sourceRoot = root;
     this.ready = true;
+  }
+
+  public buildFromObjects(roots: readonly THREE.Object3D[]): void {
+    if (roots.length === 1 && roots[0] !== undefined) {
+      this.buildFromObject(roots[0]);
+      return;
+    }
+
+    this.clear();
+
+    if (roots.length === 0) {
+      return;
+    }
+
+    const combinedRoot = new THREE.Group();
+    combinedRoot.name = 'COLLIDER_CombinedRoomRoot';
+
+    for (const root of roots) {
+      root.updateWorldMatrix(true, true);
+      this.sourceTriangleCount += this.countSourceTriangles(root);
+      const clone = root.clone(true);
+      root.matrixWorld.decompose(
+        clone.position,
+        clone.quaternion,
+        clone.scale,
+      );
+      combinedRoot.add(clone);
+    }
+
+    this.octree.fromGraphNode(combinedRoot);
+    this.sourceRoot = roots.length === 1
+      ? roots[0] ?? null
+      : combinedRoot;
+    this.ready = true;
+  }
+
+  public adoptFrom(
+    source: WorldCollision,
+    sourceRoot: THREE.Object3D,
+  ): void {
+    if (source === this || !source.isReady()) {
+      throw new Error('A ready, distinct collision world is required.');
+    }
+
+    this.clear();
+    this.octree = source.octree;
+    this.sourceRoot = sourceRoot;
+    this.ready = true;
+    this.sourceTriangleCount = source.sourceTriangleCount;
+    source.octree = new Octree();
+    source.sourceRoot = null;
+    source.ready = false;
+    source.sourceTriangleCount = 0;
   }
 
   public intersectCapsule(

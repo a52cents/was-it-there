@@ -208,7 +208,10 @@ export class GreyboxLaundryRoom extends RoomRuntime implements PlayableRoom {
     await this.loadHouseShellAssets(manager, 'laundry-room');
   }
 
-  public setExitDoorCollisionEnabled(enabled: boolean): void {
+  public setExitDoorCollisionEnabled(
+    enabled: boolean,
+    rebuildCollision = true,
+  ): void {
     const collider = this.exitDoorCollider;
     if (collider === null) {
       throw new Error('The laundry-room exit-door collider is unavailable.');
@@ -222,7 +225,9 @@ export class GreyboxLaundryRoom extends RoomRuntime implements PlayableRoom {
     } else {
       collider.removeFromParent();
     }
-    this.rebuildWorldCollision();
+    if (rebuildCollision) {
+      this.rebuildWorldCollision();
+    }
   }
 
   public setExitPortalProgress(progress: number): void {

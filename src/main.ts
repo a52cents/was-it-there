@@ -20,6 +20,11 @@ function getGameAppElements(): GameAppElements {
     "#escape-mode-description",
   );
   const storyNotebookButton = document.querySelector("#story-notebook-button");
+  const startLoader = document.querySelector("#start-loader");
+  const startLoaderLabel = document.querySelector("#start-loader-label");
+  const startLoaderValue = document.querySelector("#start-loader-value");
+  const startLoaderTrack = document.querySelector("#start-loader-track");
+  const startLoaderBar = document.querySelector("#start-loader-bar");
   const pointerLockPrompt = document.querySelector("#pointer-lock-prompt");
 
   if (!(canvas instanceof HTMLCanvasElement)) {
@@ -62,6 +67,26 @@ function getGameAppElements(): GameAppElements {
     throw new Error("Missing #story-notebook-button element.");
   }
 
+  if (!(startLoader instanceof HTMLElement)) {
+    throw new Error("Missing #start-loader element.");
+  }
+
+  if (!(startLoaderLabel instanceof HTMLElement)) {
+    throw new Error("Missing #start-loader-label element.");
+  }
+
+  if (!(startLoaderValue instanceof HTMLElement)) {
+    throw new Error("Missing #start-loader-value element.");
+  }
+
+  if (!(startLoaderTrack instanceof HTMLElement)) {
+    throw new Error("Missing #start-loader-track element.");
+  }
+
+  if (!(startLoaderBar instanceof HTMLElement)) {
+    throw new Error("Missing #start-loader-bar element.");
+  }
+
   if (!(pointerLockPrompt instanceof HTMLButtonElement)) {
     throw new Error("Missing #pointer-lock-prompt element.");
   }
@@ -77,6 +102,11 @@ function getGameAppElements(): GameAppElements {
     escapeModeButton,
     escapeModeDescription,
     storyNotebookButton,
+    startLoader,
+    startLoaderLabel,
+    startLoaderValue,
+    startLoaderTrack,
+    startLoaderBar,
     pointerLockPrompt,
   };
 }

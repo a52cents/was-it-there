@@ -13,6 +13,7 @@ import {
 export interface RoomRuntimeOptions {
   readonly scene: THREE.Scene;
   readonly worldCollision: WorldCollision;
+  readonly activateCollision?: boolean;
 }
 
 export abstract class RoomRuntime {
@@ -53,7 +54,9 @@ export abstract class RoomRuntime {
         (mesh) => mesh.layers.isEnabled(0),
       );
       options.scene.add(this.visualRoot, this.collisionRoot);
-      options.worldCollision.buildFromObject(this.collisionRoot);
+      if (options.activateCollision !== false) {
+        options.worldCollision.buildFromObject(this.collisionRoot);
+      }
       this.mountedScene = options.scene;
       this.mountedWorldCollision = options.worldCollision;
     } catch (error: unknown) {
@@ -110,7 +113,9 @@ export abstract class RoomRuntime {
 
     try {
       options.scene.add(this.visualRoot, this.collisionRoot);
-      options.worldCollision.buildFromObject(this.collisionRoot);
+      if (options.activateCollision !== false) {
+        options.worldCollision.buildFromObject(this.collisionRoot);
+      }
       this.mountedScene = options.scene;
       this.mountedWorldCollision = options.worldCollision;
     } catch (error: unknown) {

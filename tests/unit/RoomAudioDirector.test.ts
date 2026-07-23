@@ -27,7 +27,12 @@ describe('RoomAudioDirector', () => {
       ['game-soundtrack'],
       ['room-ambience'],
     ]);
-    expect(audio.stop.mock.calls).toEqual([['room-ambience']]);
+    expect(audio.stop.mock.calls).toEqual([
+      ['room-ambience'],
+      ['ambient-knock'],
+      ['ambient-footsteps'],
+      ['ambient-whisper'],
+    ]);
   });
 
   it('plays one light-return cue per blackout', () => {
@@ -58,6 +63,28 @@ describe('RoomAudioDirector', () => {
     ]);
   });
 
+  it('spaces out ambient scares and avoids an immediate repeat', () => {
+    const { audio } = createHarness();
+    const director = new RoomAudioDirector(audio, () => 0);
+
+    director.startRoom();
+    director.update(13_999);
+    expect(audio.play).not.toHaveBeenCalledWith('ambient-knock');
+
+    director.update(1);
+    expect(audio.play).toHaveBeenCalledWith('ambient-knock');
+
+    director.update(24_000);
+    expect(
+      audio.play.mock.calls.filter(([id]) =>
+        String(id).startsWith('ambient-'),
+      ),
+    ).toEqual([
+      ['ambient-knock'],
+      ['ambient-footsteps'],
+    ]);
+  });
+
   it('stops every persistent or delayed room cue when reset', () => {
     const { audio, director } = createHarness();
 
@@ -68,6 +95,9 @@ describe('RoomAudioDirector', () => {
 
     expect(audio.stop.mock.calls).toEqual([
       ['room-ambience'],
+      ['ambient-knock'],
+      ['ambient-footsteps'],
+      ['ambient-whisper'],
       ['game-soundtrack'],
       ['blackout-cue'],
       ['lights-return'],

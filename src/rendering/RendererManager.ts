@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { AfterimagePass } from 'three/addons/postprocessing/AfterimagePass.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -7,10 +6,6 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
 const MAX_PIXEL_RATIO = 1.5;
 const MAX_POST_PROCESSING_PIXEL_RATIO = 1.25;
-const MINIMUM_MOTION_BLUR = 0.02;
-const MAXIMUM_MOTION_BLUR_DAMPING = 0.58;
-const CAMERA_CUT_DISTANCE = 0.75;
-const CAMERA_CUT_ANGLE = 0.8;
 
 const ROOM_COLOR_GRADE_SHADER = {
   uniforms: {
@@ -108,13 +103,12 @@ export interface RendererStats {
 
 export class RendererManager {
   private readonly renderer: THREE.WebGLRenderer;
-  private readonly previousCameraPosition = new THREE.Vector3();
-  private readonly previousCameraQuaternion = new THREE.Quaternion();
+  private readonly warmupTarget = new THREE.WebGLRenderTarget(1, 1, {
+    depthBuffer: true,
+    stencilBuffer: false,
+  });
   private composer: EffectComposer | null = null;
-  private motionBlurPass: AfterimagePass | null = null;
   private atmospherePass: ShaderPass | null = null;
-  private hasPreviousCameraTransform = false;
-  private motionBlurPrimed = false;
   private atmosphereStress = 0;
   private atmosphereCalmPulse = 0;
   private lastWidth = 0;
@@ -183,7 +177,6 @@ export class RendererManager {
   public render(scene: THREE.Scene, camera: THREE.Camera): void {
     const composer = this.ensurePostProcessing(scene, camera);
 
-    this.updateMotionBlur(camera);
     this.updateAtmospherePass();
     this.renderer.info.reset();
     composer.render();
@@ -191,6 +184,56 @@ export class RendererManager {
 
   public invalidateShadows(): void {
     this.renderer.shadowMap.needsUpdate = true;
+  }
+
+  public async prepareObject(
+    object: THREE.Object3D,
+    camera: THREE.Camera,
+    targetScene: THREE.Scene,
+  ): Promise<void> {
+    const hiddenObjects: THREE.Object3D[] = [];
+    const initializedTextures = new Set<THREE.Texture>();
+
+    object.traverse((node) => {
+      if (!node.visible) {
+        hiddenObjects.push(node);
+        node.visible = true;
+      }
+
+      const mesh = node as THREE.Mesh;
+
+      if (!mesh.isMesh) {
+        return;
+      }
+
+      const materials = Array.isArray(mesh.material)
+        ? mesh.material
+        : [mesh.material];
+
+      for (const material of materials) {
+        for (const value of Object.values(material)) {
+          const texture = value as THREE.Texture;
+
+          if (
+            texture?.isTexture === true &&
+            !initializedTextures.has(texture)
+          ) {
+            initializedTextures.add(texture);
+            this.renderer.initTexture(texture);
+          }
+        }
+      }
+    });
+    object.updateMatrixWorld(true);
+
+    try {
+      await this.renderer.compileAsync(object, camera, targetScene);
+      this.warmObjectGeometry(object, camera);
+    } finally {
+      for (const hiddenObject of hiddenObjects) {
+        hiddenObject.visible = false;
+      }
+    }
   }
 
   public setAtmosphereProfile(stress: number, calmPulse: number): void {
@@ -210,9 +253,45 @@ export class RendererManager {
     this.composer?.passes.forEach((pass) => pass.dispose());
     this.composer?.dispose();
     this.composer = null;
-    this.motionBlurPass = null;
     this.atmospherePass = null;
+    this.warmupTarget.dispose();
     this.renderer.dispose();
+  }
+
+  private warmObjectGeometry(
+    object: THREE.Object3D,
+    camera: THREE.Camera,
+  ): void {
+    const frustumCullingStates: {
+      readonly object: THREE.Object3D;
+      readonly frustumCulled: boolean;
+    }[] = [];
+    const previousRenderTarget = this.renderer.getRenderTarget();
+    const previousShadowAutoUpdate = this.renderer.shadowMap.autoUpdate;
+    const previousShadowNeedsUpdate = this.renderer.shadowMap.needsUpdate;
+
+    object.traverse((node) => {
+      frustumCullingStates.push({
+        object: node,
+        frustumCulled: node.frustumCulled,
+      });
+      node.frustumCulled = false;
+    });
+
+    try {
+      this.renderer.shadowMap.autoUpdate = false;
+      this.renderer.shadowMap.needsUpdate = false;
+      this.renderer.setRenderTarget(this.warmupTarget);
+      this.renderer.render(object, camera);
+    } finally {
+      this.renderer.setRenderTarget(previousRenderTarget);
+      this.renderer.shadowMap.autoUpdate = previousShadowAutoUpdate;
+      this.renderer.shadowMap.needsUpdate = previousShadowNeedsUpdate;
+
+      for (const state of frustumCullingStates) {
+        state.object.frustumCulled = state.frustumCulled;
+      }
+    }
   }
 
   private ensurePostProcessing(
@@ -228,17 +307,13 @@ export class RendererManager {
       Math.min(this.lastPixelRatio, MAX_POST_PROCESSING_PIXEL_RATIO),
     );
     const renderPass = new RenderPass(scene, camera);
-    const motionBlurPass = new AfterimagePass(0);
-    motionBlurPass.enabled = false;
     const colorGradePass = new ShaderPass(ROOM_COLOR_GRADE_SHADER);
     const outputPass = new OutputPass();
 
     composer.addPass(renderPass);
-    composer.addPass(motionBlurPass);
     composer.addPass(colorGradePass);
     composer.addPass(outputPass);
     this.composer = composer;
-    this.motionBlurPass = motionBlurPass;
     this.atmospherePass = colorGradePass;
     return composer;
   }
@@ -265,62 +340,6 @@ export class RendererManager {
     timeUniform.value = performance.now() / 1_000;
     stressUniform.value = this.atmosphereStress;
     calmPulseUniform.value = this.atmosphereCalmPulse;
-  }
-
-  private updateMotionBlur(camera: THREE.Camera): void {
-    const motionBlurPass = this.motionBlurPass;
-
-    if (motionBlurPass === null) {
-      return;
-    }
-
-    if (!this.hasPreviousCameraTransform) {
-      this.copyCameraTransform(camera);
-      this.hasPreviousCameraTransform = true;
-      motionBlurPass.enabled = false;
-      return;
-    }
-
-    const distance = this.previousCameraPosition.distanceTo(camera.position);
-    const quaternionDot = Math.min(
-      Math.abs(this.previousCameraQuaternion.dot(camera.quaternion)),
-      1,
-    );
-    const angle = 2 * Math.acos(quaternionDot);
-    const isCameraCut =
-      distance >= CAMERA_CUT_DISTANCE || angle >= CAMERA_CUT_ANGLE;
-    const motionAmount = THREE.MathUtils.clamp(
-      distance * 4 + angle * 10,
-      0,
-      1,
-    );
-
-    this.copyCameraTransform(camera);
-
-    if (isCameraCut || motionAmount < MINIMUM_MOTION_BLUR) {
-      motionBlurPass.enabled = false;
-      this.motionBlurPrimed = false;
-      return;
-    }
-
-    motionBlurPass.enabled = true;
-
-    if (!this.motionBlurPrimed) {
-      motionBlurPass.damp = 0;
-      this.motionBlurPrimed = true;
-      return;
-    }
-
-    motionBlurPass.damp = THREE.MathUtils.lerp(
-      0.22,
-      MAXIMUM_MOTION_BLUR_DAMPING,
-      motionAmount,
-    );
-  }
-
-  private copyCameraTransform(camera: THREE.Camera): void {
-    this.previousCameraPosition.copy(camera.position);
-    this.previousCameraQuaternion.copy(camera.quaternion);
   }
 
   private readonly handleWindowResize = (): void => {
